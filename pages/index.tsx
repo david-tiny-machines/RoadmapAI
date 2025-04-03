@@ -1,19 +1,22 @@
-import type { NextPage } from "next";
-import Head from "next/head";
-import ComponentsDemo from "./components";
+import Link from 'next/link';
 
-const Home: NextPage = () => {
+export default function Home() {
   return (
-    <>
-      <Head>
-        <title>RoadmapAI - Component Library</title>
-        <meta name="description" content="RoadmapAI component library and design system" />
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
-
-      <ComponentsDemo />
-    </>
+    <div className="text-center">
+      <h1 className="text-4xl font-bold text-gray-900 mb-4">
+        Welcome to RoadmapAI
+      </h1>
+      <p className="text-xl text-gray-600 mb-8">
+        Your intelligent product roadmap planning assistant
+      </p>
+      <div className="space-x-4">
+        <Link href="/initiatives" className="btn-primary">
+          View Initiatives
+        </Link>
+        <Link href="/capacity" className="btn-secondary">
+          Manage Capacity
+        </Link>
+      </div>
+    </div>
   );
-};
-
-export default Home;
+}
