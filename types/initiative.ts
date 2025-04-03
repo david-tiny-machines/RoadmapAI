@@ -12,12 +12,10 @@ export interface Initiative {
   id: string;
   name: string;
   valueLever: ValueLever;
-  estimatedUplift: number;
+  uplift: number;
   confidence: number;
   effortEstimate: number;
-  startMonth: string;
-  endMonth: string;
   isMandatory: boolean;
-  createdAt: string;
-  updatedAt: string;
+  startMonth?: string;
+  endMonth?: string;
 } 

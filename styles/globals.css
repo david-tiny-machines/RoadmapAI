@@ -39,3 +39,20 @@ a {
 * {
   box-sizing: border-box;
 }
+
+.capacity-chart-wrapper {
+  width: 100%;
+  position: relative;
+}
+
+.capacity-chart-container {
+  width: 100%;
+  min-height: 400px;
+  position: relative;
+}
+
+.capacity-chart-container .recharts-wrapper {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
