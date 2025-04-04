@@ -6,10 +6,10 @@ export async function middleware(req: NextRequest) {
   console.log('Middleware executing for path:', req.nextUrl.pathname);
   
   // Only run middleware for specific routes
-  const protectedPaths = ['/initiatives'];
+  const protectedPaths = ['/initiatives', '/capacity'];
   const authPaths = ['/auth/login', '/auth/signup'];
-  const isProtectedPath = protectedPaths.some(path => req.nextUrl.pathname.startsWith(path));
-  const isAuthPath = authPaths.some(path => req.nextUrl.pathname.startsWith(path));
+  const isProtectedPath = protectedPaths.some(path => req.nextUrl.pathname === path);
+  const isAuthPath = authPaths.some(path => req.nextUrl.pathname === path);
 
   // If not a protected or auth path, skip middleware
   if (!isProtectedPath && !isAuthPath) {

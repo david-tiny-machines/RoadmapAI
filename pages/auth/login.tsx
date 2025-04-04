@@ -21,12 +21,7 @@ export default function LoginPage() {
       console.log('Calling signIn...');
       await signIn(email, password);
       console.log('SignIn successful, redirecting...');
-      
-      // Force a hard navigation to the initiatives page
-      const baseUrl = window.location.origin;
-      const targetUrl = `${baseUrl}/initiatives`;
-      console.log('Redirecting to:', targetUrl);
-      window.location.assign(targetUrl);
+      router.push('/initiatives');
       
     } catch (err) {
       console.error('Detailed login error:', err);
