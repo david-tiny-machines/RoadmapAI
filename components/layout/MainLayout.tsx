@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
@@ -10,10 +10,22 @@ interface MainLayoutProps {
 const MainLayout = ({ children }: MainLayoutProps) => {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
-    await signOut();
-    router.push('/auth/signin');
+    try {
+      setIsSigningOut(true);
+      const { error } = await signOut();
+      if (error) {
+        console.error('Error signing out:', error);
+        return;
+      }
+      router.push('/auth/signin');
+    } catch (err) {
+      console.error('Error during sign out:', err);
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   return (
@@ -49,9 +61,10 @@ const MainLayout = ({ children }: MainLayoutProps) => {
                   <span className="text-sm text-gray-700">{user.email}</span>
                   <button
                     onClick={handleSignOut}
-                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    disabled={isSigningOut}
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                   >
-                    Sign out
+                    {isSigningOut ? 'Signing out...' : 'Sign out'}
                   </button>
                 </div>
               )}

@@ -7,7 +7,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null; user: User | null }>;
-  signOut: () => Promise<void>;
+  signOut: () => Promise<{ error: AuthError | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,21 +21,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data: existingProfile, error: fetchError } = await supabase
         .from('user_profiles')
-        .select()
+        .select('id, email, role')
         .eq('id', user.id)
         .single();
 
-      if (!existingProfile && !fetchError) {
-        // Create new profile
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching user profile:', fetchError);
+        return;
+      }
+
+      if (!existingProfile) {
         const { error: insertError } = await supabase
           .from('user_profiles')
-          .insert([
-            {
-              id: user.id,
-              email: user.email,
-              role: 'user'
-            }
-          ]);
+          .upsert({
+            id: user.id,
+            email: user.email,
+            role: 'user'
+          }, {
+            onConflict: 'id'
+          });
 
         if (insertError) {
           console.error('Error creating user profile:', insertError);
@@ -92,10 +96,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       });
+      
+      if (!error && data.user) {
+        await ensureUserProfile(data.user);
+      }
+      
       return { error, user: data?.user ?? null };
     },
     signOut: async () => {
-      await supabase.auth.signOut();
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (!error) {
+          setUser(null); // Explicitly clear user state
+        }
+        return { error };
+      } catch (err) {
+        console.error('Error during sign out:', err);
+        return { error: err as AuthError };
+      }
     },
   };
 
