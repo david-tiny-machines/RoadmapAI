@@ -1,166 +1,177 @@
-import { useState } from 'react';
-import { Initiative } from '../../types/initiative';
+import { useState, FormEvent } from 'react';
+import { Initiative, ValueLever } from '../../types/initiative';
+
+const VALUE_LEVERS: ValueLever[] = [
+  'Conversion',
+  'Average Loan Size',
+  'Interest Rate',
+  'Customer Acquisition',
+  'Customer Retention',
+  'Cost Reduction',
+  'Compliance/Risk Mitigation',
+  'BAU obligations',
+];
 
 interface InitiativeFormProps {
-  onSubmit: (initiative: Omit<Initiative, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'priority_score'>) => void;
+  onSubmit: (initiative: Omit<Initiative, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  initialData?: Initiative;
 }
 
-export default function InitiativeForm({ onSubmit }: InitiativeFormProps) {
+export default function InitiativeForm({ onSubmit, initialData }: InitiativeFormProps) {
   const [formData, setFormData] = useState({
-    name: '',
-    value_lever: '',
-    uplift: 0,
-    confidence: 0,
-    effort_estimate: 0,
-    start_month: '',
-    end_month: '',
-    is_mandatory: false,
+    name: initialData?.name || '',
+    valueLever: initialData?.valueLever || VALUE_LEVERS[0],
+    uplift: initialData?.uplift || 0,
+    confidence: initialData?.confidence || 50,
+    effortEstimate: initialData?.effortEstimate || 1,
+    startMonth: initialData?.startMonth || '',
+    endMonth: initialData?.endMonth || '',
+    isMandatory: initialData?.isMandatory || false,
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
-    setFormData({
-      name: '',
-      value_lever: '',
-      uplift: 0,
-      confidence: 0,
-      effort_estimate: 0,
-      start_month: '',
-      end_month: '',
-      is_mandatory: false,
-    });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md">
-      <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl mx-auto bg-white p-6 rounded-xl shadow-soft">
+      {/* Name */}
+      <div>
+        <label htmlFor="name" className="form-label">
+          Initiative Name
+        </label>
+        <input
+          type="text"
+          id="name"
+          className="input-field"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          required
+        />
+      </div>
+
+      {/* Value Lever */}
+      <div>
+        <label htmlFor="valueLever" className="form-label">
+          Value Lever
+        </label>
+        <select
+          id="valueLever"
+          className="input-field"
+          value={formData.valueLever}
+          onChange={(e) => setFormData({ ...formData, valueLever: e.target.value as ValueLever })}
+          required
+        >
+          {VALUE_LEVERS.map((lever) => (
+            <option key={lever} value={lever}>
+              {lever}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Estimated Uplift */}
+      <div>
+        <label htmlFor="uplift" className="form-label">
+          Estimated Uplift (%)
+        </label>
+        <input
+          type="number"
+          id="uplift"
+          className="input-field"
+          value={formData.uplift}
+          onChange={(e) => setFormData({ ...formData, uplift: parseFloat(e.target.value) })}
+          step="0.1"
+          required
+        />
+      </div>
+
+      {/* Confidence */}
+      <div>
+        <label htmlFor="confidence" className="form-label">
+          Confidence (%)
+        </label>
+        <div className="flex items-center space-x-4">
+          <input
+            type="range"
+            id="confidence"
+            className="w-full"
+            value={formData.confidence}
+            onChange={(e) => setFormData({ ...formData, confidence: parseInt(e.target.value) })}
+            min="0"
+            max="100"
+            step="1"
+          />
+          <span className="text-sm font-medium w-12">{formData.confidence}%</span>
+        </div>
+      </div>
+
+      {/* Effort Estimate */}
+      <div>
+        <label htmlFor="effortEstimate" className="form-label">
+          Effort Estimate (days)
+        </label>
+        <input
+          type="number"
+          id="effortEstimate"
+          className="input-field"
+          value={formData.effortEstimate}
+          onChange={(e) => setFormData({ ...formData, effortEstimate: parseInt(e.target.value) })}
+          min="1"
+          required
+        />
+      </div>
+
+      {/* Date Range */}
+      <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-            Initiative Name
+          <label htmlFor="startMonth" className="form-label flex items-center space-x-1">
+            <span>Start Month</span>
+            <span className="text-sm text-gray-500">(Optional)</span>
           </label>
           <input
-            type="text"
-            id="name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            required
+            type="month"
+            id="startMonth"
+            className="input-field"
+            value={formData.startMonth}
+            onChange={(e) => setFormData({ ...formData, startMonth: e.target.value })}
           />
         </div>
-
         <div>
-          <label htmlFor="value_lever" className="block text-sm font-medium text-gray-700">
-            Value Lever
+          <label htmlFor="endMonth" className="form-label flex items-center space-x-1">
+            <span>End Month</span>
+            <span className="text-sm text-gray-500">(Optional)</span>
           </label>
           <input
-            type="text"
-            id="value_lever"
-            value={formData.value_lever}
-            onChange={(e) => setFormData({ ...formData, value_lever: e.target.value })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            required
+            type="month"
+            id="endMonth"
+            className="input-field"
+            value={formData.endMonth}
+            onChange={(e) => setFormData({ ...formData, endMonth: e.target.value })}
           />
         </div>
+      </div>
 
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="uplift" className="block text-sm font-medium text-gray-700">
-              Uplift (%)
-            </label>
-            <input
-              type="number"
-              id="uplift"
-              value={formData.uplift}
-              onChange={(e) => setFormData({ ...formData, uplift: Number(e.target.value) })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-              min="0"
-              max="100"
-              required
-            />
-          </div>
+      {/* Mandatory Toggle */}
+      <div className="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          id="isMandatory"
+          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+          checked={formData.isMandatory}
+          onChange={(e) => setFormData({ ...formData, isMandatory: e.target.checked })}
+        />
+        <label htmlFor="isMandatory" className="text-sm font-medium text-gray-700">
+          Mandatory Initiative
+        </label>
+      </div>
 
-          <div>
-            <label htmlFor="confidence" className="block text-sm font-medium text-gray-700">
-              Confidence (%)
-            </label>
-            <input
-              type="number"
-              id="confidence"
-              value={formData.confidence}
-              onChange={(e) => setFormData({ ...formData, confidence: Number(e.target.value) })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-              min="0"
-              max="100"
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="effort_estimate" className="block text-sm font-medium text-gray-700">
-              Effort (days)
-            </label>
-            <input
-              type="number"
-              id="effort_estimate"
-              value={formData.effort_estimate}
-              onChange={(e) => setFormData({ ...formData, effort_estimate: Number(e.target.value) })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-              min="0"
-              required
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="start_month" className="block text-sm font-medium text-gray-700">
-              Start Month
-            </label>
-            <input
-              type="month"
-              id="start_month"
-              value={formData.start_month}
-              onChange={(e) => setFormData({ ...formData, start_month: e.target.value })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="end_month" className="block text-sm font-medium text-gray-700">
-              End Month
-            </label>
-            <input
-              type="month"
-              id="end_month"
-              value={formData.end_month}
-              onChange={(e) => setFormData({ ...formData, end_month: e.target.value })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="is_mandatory"
-            checked={formData.is_mandatory}
-            onChange={(e) => setFormData({ ...formData, is_mandatory: e.target.checked })}
-            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-          />
-          <label htmlFor="is_mandatory" className="ml-2 block text-sm text-gray-900">
-            Mandatory Initiative
-          </label>
-        </div>
-
-        <div className="pt-4">
-          <button
-            type="submit"
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            Add Initiative
-          </button>
-        </div>
+      {/* Submit Button */}
+      <div className="flex justify-end">
+        <button type="submit" className="btn-primary">
+          Save Initiative
+        </button>
       </div>
     </form>
   );

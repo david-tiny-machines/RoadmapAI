@@ -1,40 +1,11 @@
 import { ReactNode } from 'react';
 import Link from 'next/link';
-import { useAuth } from '../../contexts/AuthContext';
-import { useRouter } from 'next/router';
 
 interface MainLayoutProps {
   children: ReactNode;
 }
 
 const MainLayout = ({ children }: MainLayoutProps) => {
-  const { user, signOut, loading } = useAuth();
-  const router = useRouter();
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      router.push('/auth/login');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
-  // Don't show layout while checking auth status
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
-  // Don't show nav bar on auth pages
-  const isAuthPage = router.pathname.startsWith('/auth/');
-  if (isAuthPage) {
-    return <>{children}</>;
-  }
-
   return (
     <div className="min-h-screen">
       {/* Navigation Header */}
@@ -49,50 +20,17 @@ const MainLayout = ({ children }: MainLayoutProps) => {
                 </Link>
               </div>
               {/* Navigation Links */}
-              {user && (
-                <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                  <Link
-                    href="/initiatives"
-                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-primary-500"
-                  >
-                    Initiatives
-                  </Link>
-                  <Link
-                    href="/capacity"
-                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-primary-500"
-                  >
-                    Capacity
-                  </Link>
-                  <Link
-                    href="/roadmap"
-                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-primary-500"
-                  >
-                    Roadmap
-                  </Link>
-                </div>
-              )}
-            </div>
-            
-            {/* User Menu */}
-            <div className="flex items-center">
-              {user ? (
-                <div className="flex items-center space-x-4">
-                  <span className="text-sm text-gray-700">{user.email}</span>
-                  <button
-                    onClick={handleSignOut}
-                    className="text-sm text-gray-700 hover:text-primary-600"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              ) : (
-                <Link
-                  href="/auth/login"
-                  className="text-sm font-medium text-primary-600 hover:text-primary-500"
-                >
-                  Sign in
+              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+                <Link href="/initiatives" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-primary-500">
+                  Initiatives
                 </Link>
-              )}
+                <Link href="/capacity" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-primary-500">
+                  Capacity
+                </Link>
+                <Link href="/roadmap" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-primary-500">
+                  Roadmap
+                </Link>
+              </div>
             </div>
           </div>
         </div>
