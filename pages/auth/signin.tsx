@@ -1,29 +1,34 @@
 import { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
-import { logger } from '../../utils/logger';
+import Link from 'next/link';
+import { useAuth } from '../../contexts/AuthContext';
 
-export default function LoginPage() {
+export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const { signIn } = useAuth();
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { signIn } = useAuth();
+  const message = router.query.message as string;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setLoading(true);
 
     try {
-      logger.log('Attempting login', { email });
-      
-      await signIn(email, password);
-      
-      logger.log('Login successful, redirecting to initiatives');
-      await router.push('/initiatives');
-    } catch (error) {
-      logger.error('Login failed', error);
-      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+      const { error: signInError } = await signIn(email, password);
+      if (signInError) {
+        setError(signInError.message);
+      } else {
+        const redirectTo = router.query.redirectTo as string || '/';
+        router.push(redirectTo);
+      }
+    } catch (err) {
+      setError('An unexpected error occurred');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -32,23 +37,24 @@ export default function LoginPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to RoadmapAI
+            Sign in to your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500">
-              create a new account
-            </a>
-          </p>
         </div>
+
+        {message && (
+          <div className="rounded-md bg-blue-50 p-4">
+            <div className="text-sm text-blue-700">{message}</div>
+          </div>
+        )}
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
-              <label htmlFor="email-address" className="sr-only">
+              <label htmlFor="email" className="sr-only">
                 Email address
               </label>
               <input
-                id="email-address"
+                id="email"
                 name="email"
                 type="email"
                 autoComplete="email"
@@ -78,18 +84,23 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="text-red-600 text-sm text-center">
-              {error}
-            </div>
+            <div className="text-red-500 text-sm text-center">{error}</div>
           )}
 
           <div>
             <button
               type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              disabled={loading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
             >
-              Sign in
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
+          </div>
+
+          <div className="text-sm text-center">
+            <Link href="/auth/signup" className="font-medium text-indigo-600 hover:text-indigo-500">
+              Don't have an account? Sign up
+            </Link>
           </div>
         </form>
       </div>

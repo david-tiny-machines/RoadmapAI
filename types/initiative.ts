@@ -10,7 +10,6 @@ export type ValueLever =
 
 export interface Initiative {
   id: string;
-  user_id?: string; // Optional for local storage, required for Supabase
   name: string;
   valueLever: ValueLever;
   uplift: number;

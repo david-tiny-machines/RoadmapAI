@@ -1,10 +1,12 @@
 import type { AppProps } from 'next/app';
-import MainLayout from '../components/layout/MainLayout';
+import { useRouter } from 'next/router';
 import { AuthProvider } from '../contexts/AuthContext';
+import MainLayout from '../components/layout/MainLayout';
 import '../styles/globals.css';
 
 export default function App({ Component, pageProps }: AppProps) {
-  const isAuthPage = Component.displayName === 'LoginPage' || Component.displayName === 'SignupPage';
+  const router = useRouter();
+  const isAuthPage = router.pathname.startsWith('/auth/');
 
   return (
     <AuthProvider>

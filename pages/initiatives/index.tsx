@@ -3,12 +3,10 @@ import InitiativeForm from '../../components/initiatives/InitiativeForm';
 import InitiativeList from '../../components/initiatives/InitiativeList';
 import { Initiative } from '../../types/initiative';
 import { sortInitiativesByPriority } from '../../utils/prioritizationUtils';
-import { useAuth } from '../../contexts/AuthContext';
 
 const STORAGE_KEY = 'roadmapai_initiatives';
 
 export default function Initiatives() {
-  const { user } = useAuth(); // Keep Supabase auth
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null);
   const [showForm, setShowForm] = useState(false);
