@@ -1,6 +1,15 @@
 import { Initiative } from '../types/initiative';
 import { MonthlyCapacity } from '../types/capacity';
 
+/**
+ * Represents the effort allocation for a specific month
+ * @interface MonthlyEffort
+ * @property {string} month - The month in YYYY-MM format
+ * @property {number} availableDays - Total available working days in the month
+ * @property {number} totalEffort - Total effort allocated (mandatory + optional)
+ * @property {number} mandatoryEffort - Effort allocated to mandatory initiatives
+ * @property {number} optionalEffort - Effort allocated to optional initiatives
+ */
 interface MonthlyEffort {
   month: string;
   availableDays: number;
@@ -9,6 +18,19 @@ interface MonthlyEffort {
   optionalEffort: number;
 }
 
+/**
+ * Calculates the monthly effort distribution for a set of initiatives
+ * @param {Initiative[]} initiatives - Array of initiatives to calculate effort for
+ * @param {MonthlyCapacity[]} monthlyCapacities - Array of monthly capacity values
+ * @returns {MonthlyEffort[]} Array of monthly effort calculations
+ * 
+ * @description
+ * For each initiative, the function:
+ * 1. Determines start and end dates (uses defaults if not specified)
+ * 2. Distributes effort evenly across the initiative's duration
+ * 3. Categorizes effort as mandatory or optional
+ * 4. Aggregates effort by month
+ */
 export function calculateMonthlyEffort(
   initiatives: Initiative[] = [],
   monthlyCapacities: MonthlyCapacity[] = []
