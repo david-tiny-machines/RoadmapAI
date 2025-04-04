@@ -1,128 +1,145 @@
-import { useState, useEffect } from 'react';
-import InitiativeForm from '../../components/initiatives/InitiativeForm';
+import { useEffect, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import InitiativeList from '../../components/initiatives/InitiativeList';
+import InitiativeForm from '../../components/initiatives/InitiativeForm';
 import { Initiative } from '../../types/initiative';
 import { sortInitiativesByPriority } from '../../utils/prioritizationUtils';
-
-const STORAGE_KEY = 'roadmapai_initiatives';
+import { supabase } from '../../utils/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { migrateLocalStorageToSupabase } from '../../utils/migrateData';
 
 export default function Initiatives() {
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
-  const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [isClient, setIsClient] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [hasLocalData, setHasLocalData] = useState(false);
+  const { user } = useAuth();
 
-  // Set isClient to true when component mounts
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setIsClient(true);
-    }, 0);
-    return () => clearTimeout(timeout);
-  }, []);
+    console.log('Initiatives page mounted, user:', user);
+    fetchInitiatives();
+    checkLocalStorage();
+  }, [user]);
 
-  // Load initiatives from local storage
-  useEffect(() => {
-    if (!isClient) return;
+  const checkLocalStorage = () => {
+    const stored = localStorage.getItem('roadmapai_initiatives');
+    setHasLocalData(!!stored);
+  };
 
+  const fetchInitiatives = async () => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setInitiatives(parsed);
+      console.log('Fetching initiatives for user:', user?.id);
+      const { data, error } = await supabase
+        .from('initiatives')
+        .select('*')
+        .order('is_mandatory', { ascending: false })
+        .order('priority_score', { ascending: false });
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
       }
+      console.log('Fetched initiatives:', data);
+      setInitiatives(data || []);
     } catch (error) {
-      console.error('Error loading initiatives:', error);
+      console.error('Error fetching initiatives:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [isClient]);
+  };
 
-  // Save initiatives to local storage
-  useEffect(() => {
-    if (!isClient) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initiatives));
-  }, [initiatives, isClient]);
+  const handleMigration = async () => {
+    if (!user) return;
+    try {
+      await migrateLocalStorageToSupabase(user.id);
+      setHasLocalData(false);
+      await fetchInitiatives();
+    } catch (error) {
+      console.error('Error during migration:', error);
+    }
+  };
 
-  const handleSubmit = (initiativeData: Omit<Initiative, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (editingInitiative) {
-      // Update existing initiative
-      const updated = initiatives.map((i) =>
-        i.id === editingInitiative.id
-          ? {
-              ...initiativeData,
-              id: editingInitiative.id,
-              createdAt: editingInitiative.createdAt,
-              updatedAt: new Date().toISOString(),
-            }
-          : i
-      );
-      setInitiatives(sortInitiativesByPriority(updated));
-    } else {
-      // Create new initiative
-      const newInitiative: Initiative = {
-        ...initiativeData,
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+  const handleSubmit = async (initiative: Omit<Initiative, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'priority_score'>) => {
+    try {
+      const newInitiative = {
+        ...initiative,
+        id: uuidv4(),
+        user_id: user?.id,
+        priority_score: initiative.uplift * initiative.confidence / initiative.effort_estimate
       };
-      setInitiatives((prev) => sortInitiativesByPriority([...prev, newInitiative]));
+
+      const { error } = await supabase
+        .from('initiatives')
+        .insert([newInitiative]);
+
+      if (error) throw error;
+      
+      await fetchInitiatives();
+    } catch (error) {
+      console.error('Error adding initiative:', error);
     }
-    setEditingInitiative(null);
-    setShowForm(false);
   };
 
-  const handleEdit = (initiative: Initiative) => {
-    setEditingInitiative(initiative);
-    setShowForm(true);
+  const handleUpdate = async (updatedInitiative: Initiative) => {
+    try {
+      const { error } = await supabase
+        .from('initiatives')
+        .update({
+          ...updatedInitiative,
+          priority_score: updatedInitiative.uplift * updatedInitiative.confidence / updatedInitiative.effort_estimate,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', updatedInitiative.id);
+
+      if (error) throw error;
+      
+      await fetchInitiatives();
+    } catch (error) {
+      console.error('Error updating initiative:', error);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setInitiatives((prev) => prev.filter((i) => i.id !== id));
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('initiatives')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      await fetchInitiatives();
+    } catch (error) {
+      console.error('Error deleting initiative:', error);
+    }
   };
 
-  if (!isClient) {
-    return (
-      <div>
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Initiatives</h1>
-          <p className="mt-2 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
+  if (loading) {
+    return <div>Loading initiatives...</div>;
   }
 
   return (
-    <div>
-      <div className="mb-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Initiatives</h1>
-            <p className="mt-2 text-gray-600">Create and manage your product initiatives.</p>
-          </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Initiatives</h1>
+        {hasLocalData && (
           <button
-            onClick={() => {
-              setEditingInitiative(null);
-              setShowForm(!showForm);
-            }}
-            className="btn-primary"
+            onClick={handleMigration}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
           >
-            {showForm ? 'Close Form' : 'New Initiative'}
+            Migrate Local Data
           </button>
-        </div>
+        )}
       </div>
-
-      {showForm && (
-        <div className="mb-8">
-          <InitiativeForm
-            onSubmit={handleSubmit}
-            initialData={editingInitiative || undefined}
-          />
-        </div>
-      )}
-
-      <InitiativeList
-        initiatives={initiatives}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
+      <div className="grid grid-cols-1 gap-8">
+        <InitiativeForm onSubmit={handleSubmit} />
+        <InitiativeList
+          initiatives={initiatives}
+          onUpdate={handleUpdate}
+          onDelete={handleDelete}
+        />
+      </div>
     </div>
   );
-} 
+}
+
+Initiatives.displayName = 'InitiativesPage'; 

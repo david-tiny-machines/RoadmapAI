@@ -21,17 +21,18 @@ import {
   verticalListSortingStrategy
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 /**
  * Props for the InitiativeList component
  * @interface InitiativeListProps
  * @property {Initiative[]} initiatives - Array of initiatives to display and manage
- * @property {function} onEdit - Callback function when an initiative is edited
+ * @property {function} onUpdate - Callback function when an initiative is updated
  * @property {function} onDelete - Callback function when an initiative is deleted
  */
 interface InitiativeListProps {
   initiatives: Initiative[];
-  onEdit: (initiative: Initiative) => void;
+  onUpdate: (initiative: Initiative) => void;
   onDelete: (id: string) => void;
 }
 
@@ -105,9 +106,9 @@ function DeleteModal({ isOpen, onConfirm, onCancel }: DeleteModalProps) {
   );
 }
 
-function SortableItem({ item, onEdit, onDelete }: { 
+function SortableItem({ item, onUpdate, onDelete }: { 
   item: Initiative; 
-  onEdit: (initiative: Initiative) => void;
+  onUpdate: (initiative: Initiative) => void;
   onDelete: (id: string) => void;
 }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -144,7 +145,7 @@ function SortableItem({ item, onEdit, onDelete }: {
         ref={setNodeRef}
         style={style}
         className={`p-4 rounded-lg border mb-2 ${
-          item.isMandatory ? 'bg-yellow-50' : 'bg-white'
+          item.is_mandatory ? 'bg-yellow-50' : 'bg-white'
         } ${isDragging ? 'shadow-lg' : ''}`}
       >
         <div className="flex items-center justify-between">
@@ -159,32 +160,32 @@ function SortableItem({ item, onEdit, onDelete }: {
             <div>
               <div className="font-medium flex items-center">
                 {item.name}
-                {item.isMandatory && (
+                {item.is_mandatory && (
                   <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
                     Mandatory
                   </span>
                 )}
               </div>
               <div className="text-sm text-gray-500">
-                {item.valueLever}
-                {(item.startMonth || item.endMonth) && (
+                {item.value_lever}
+                {(item.start_month || item.end_month) && (
                   <span className="ml-2 text-gray-400">
-                    {item.startMonth && !item.endMonth && `From ${formatMonthYear(item.startMonth)}`}
-                    {!item.startMonth && item.endMonth && `Until ${formatMonthYear(item.endMonth)}`}
-                    {item.startMonth && item.endMonth && `${formatMonthYear(item.startMonth)} to ${formatMonthYear(item.endMonth)}`}
+                    {item.start_month && !item.end_month && `From ${formatMonthYear(item.start_month)}`}
+                    {!item.start_month && item.end_month && `Until ${formatMonthYear(item.end_month)}`}
+                    {item.start_month && item.end_month && `${formatMonthYear(item.start_month)} to ${formatMonthYear(item.end_month)}`}
                   </span>
                 )}
               </div>
               <div className="text-xs text-gray-400 mt-1">
                 Priority Score: {priorityScore.toFixed(2)} • 
-                Effort: {item.effortEstimate} days • 
+                Effort: {item.effort_estimate} days • 
                 Impact: {weightedImpact.toFixed(2)}%
               </div>
             </div>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => onEdit(item)}
+              onClick={() => onUpdate(item)}
               className="text-indigo-600 hover:text-indigo-900"
             >
               Edit
@@ -207,7 +208,7 @@ function SortableItem({ item, onEdit, onDelete }: {
   );
 }
 
-export default function InitiativeList({ initiatives, onEdit, onDelete }: InitiativeListProps) {
+export default function InitiativeList({ initiatives, onUpdate, onDelete }: InitiativeListProps) {
   const [items, setItems] = useState<Initiative[]>([]);
   const [showResetModal, setShowResetModal] = useState(false);
   
@@ -233,7 +234,7 @@ export default function InitiativeList({ initiatives, onEdit, onDelete }: Initia
         // Prevent dragging optional items above mandatory ones
         const draggedItem = items[oldIndex];
         const targetItem = items[newIndex];
-        if (!draggedItem.isMandatory && targetItem.isMandatory) {
+        if (!draggedItem.is_mandatory && targetItem.is_mandatory) {
           return items;
         }
         
@@ -245,8 +246,8 @@ export default function InitiativeList({ initiatives, onEdit, onDelete }: Initia
   const handleReset = () => {
     // Sort by mandatory first, then by priority score
     const sortedItems = [...initiatives].sort((a, b) => {
-      if (a.isMandatory !== b.isMandatory) {
-        return a.isMandatory ? -1 : 1;
+      if (a.is_mandatory !== b.is_mandatory) {
+        return a.is_mandatory ? -1 : 1;
       }
       const scoreA = calculatePriorityScore(a);
       const scoreB = calculatePriorityScore(b);
@@ -254,6 +255,24 @@ export default function InitiativeList({ initiatives, onEdit, onDelete }: Initia
     });
     setItems(sortedItems);
     setShowResetModal(false);
+  };
+
+  const handleDragEndDnd = (result: any) => {
+    if (!result.destination) return;
+
+    const items = Array.from(initiatives);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    // Update all affected initiatives with new order
+    items.forEach((initiative, index) => {
+      if (initiative.priority_score !== items.length - index) {
+        onUpdate({
+          ...initiative,
+          priority_score: items.length - index
+        });
+      }
+    });
   };
 
   return (
@@ -282,27 +301,80 @@ export default function InitiativeList({ initiatives, onEdit, onDelete }: Initia
         onCancel={() => setShowResetModal(false)}
       />
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext
-          items={items.map(item => item.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="bg-white rounded-xl shadow-soft">
-            {items.map((item) => (
-              <SortableItem
-                key={item.id}
-                item={item}
-                onEdit={onEdit}
-                onDelete={onDelete}
-              />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
+      <DragDropContext onDragEnd={handleDragEndDnd}>
+        <Droppable droppableId="initiatives">
+          {(provided) => (
+            <div
+              {...provided.droppableProps}
+              ref={provided.innerRef}
+              className="space-y-4"
+            >
+              {items.map((initiative, index) => (
+                <Draggable
+                  key={initiative.id}
+                  draggableId={initiative.id}
+                  index={index}
+                >
+                  {(provided) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      {...provided.dragHandleProps}
+                      className="bg-white p-6 rounded-lg shadow-md"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="text-xl font-semibold">{initiative.name}</h3>
+                          <p className="text-gray-600 mt-1">{initiative.value_lever}</p>
+                          <div className="text-sm text-gray-500 mt-2">
+                            {initiative.start_month && initiative.end_month ? (
+                              `${formatMonthYear(initiative.start_month)} to ${formatMonthYear(initiative.end_month)}`
+                            ) : initiative.start_month ? (
+                              `From ${formatMonthYear(initiative.start_month)}`
+                            ) : initiative.end_month ? (
+                              `Until ${formatMonthYear(initiative.end_month)}`
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => onDelete(initiative.id)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-sm text-gray-500">Uplift</label>
+                          <p className="font-medium">{initiative.uplift}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm text-gray-500">Confidence</label>
+                          <p className="font-medium">{initiative.confidence}%</p>
+                        </div>
+                        <div>
+                          <label className="text-sm text-gray-500">Effort</label>
+                          <p className="font-medium">{initiative.effort_estimate}</p>
+                        </div>
+                      </div>
+                      {initiative.is_mandatory && (
+                        <div className="mt-4">
+                          <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">
+                            Mandatory
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </DragDropContext>
     </div>
   );
 } 

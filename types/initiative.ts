@@ -10,14 +10,16 @@ export type ValueLever =
 
 export interface Initiative {
   id: string;
+  user_id: string;
   name: string;
-  valueLever: ValueLever;
+  value_lever: string;
   uplift: number;
   confidence: number;
-  effortEstimate: number;
-  isMandatory: boolean;
-  startMonth?: string;
-  endMonth?: string;
-  createdAt: string;
-  updatedAt: string;
+  effort_estimate: number;
+  priority_score: number;
+  start_month: string | null;
+  end_month: string | null;
+  is_mandatory: boolean;
+  created_at: string;
+  updated_at: string;
 } 
