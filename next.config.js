@@ -3,7 +3,7 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    allowedDevOrigins: ['*.replit.dev'],
+    allowedDevOrigins: ['tntwy9r5rm9l.janeway.replit.dev'],
   },
   webpack: (config, { dev }) => {
     if (dev) {
