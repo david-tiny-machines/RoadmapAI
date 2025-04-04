@@ -18,4 +18,6 @@ export interface Initiative {
   isMandatory: boolean;
   startMonth?: string;
   endMonth?: string;
+  createdAt: string;
+  updatedAt: string;
 } 

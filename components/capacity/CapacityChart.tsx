@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  BarChart,
+  ComposedChart,
   Bar,
   XAxis,
   YAxis,
@@ -8,7 +8,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ReferenceLine,
+  Line,
 } from 'recharts';
 import { Initiative } from '../../types/initiative';
 import { MonthlyCapacity } from '../../types/capacity';
@@ -72,7 +72,7 @@ export default function CapacityChart({ initiatives = [], monthlyCapacities = []
         <h3 className="text-lg font-semibold text-gray-900 mb-6">Capacity vs. Effort</h3>
         <div className="h-[400px]">
           <ResponsiveContainer width="100%" height={400}>
-            <BarChart
+            <ComposedChart
               data={data}
               margin={{
                 top: 20,
@@ -107,18 +107,16 @@ export default function CapacityChart({ initiatives = [], monthlyCapacities = []
                 fill="#2563eb"
                 name="Optional Effort"
               />
-              <ReferenceLine
-                y={data[0]?.availableDays}
+              <Line
+                type="monotone"
+                dataKey="availableDays"
                 stroke="#059669"
                 strokeWidth={2}
                 strokeDasharray="3 3"
-                label={{
-                  value: "Available Capacity",
-                  fill: "#059669",
-                  position: "right"
-                }}
+                dot={false}
+                name="Available Capacity"
               />
-            </BarChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
         <CapacityWarning data={data} />

@@ -21,7 +21,7 @@ export default function InitiativeForm({ onSubmit, initialData }: InitiativeForm
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     valueLever: initialData?.valueLever || VALUE_LEVERS[0],
-    estimatedUplift: initialData?.estimatedUplift || 0,
+    uplift: initialData?.uplift || 0,
     confidence: initialData?.confidence || 50,
     effortEstimate: initialData?.effortEstimate || 1,
     startMonth: initialData?.startMonth || '',
@@ -73,15 +73,15 @@ export default function InitiativeForm({ onSubmit, initialData }: InitiativeForm
 
       {/* Estimated Uplift */}
       <div>
-        <label htmlFor="estimatedUplift" className="form-label">
+        <label htmlFor="uplift" className="form-label">
           Estimated Uplift (%)
         </label>
         <input
           type="number"
-          id="estimatedUplift"
+          id="uplift"
           className="input-field"
-          value={formData.estimatedUplift}
-          onChange={(e) => setFormData({ ...formData, estimatedUplift: parseFloat(e.target.value) })}
+          value={formData.uplift}
+          onChange={(e) => setFormData({ ...formData, uplift: parseFloat(e.target.value) })}
           step="0.1"
           required
         />

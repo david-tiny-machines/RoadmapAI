@@ -9,21 +9,41 @@ export default function Initiatives() {
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  // Set isClient to true when component mounts
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Load initiatives from local storage
   useEffect(() => {
+    if (!isClient) return;
+
+    console.log('Loading initiatives from local storage');
     const stored = localStorage.getItem(STORAGE_KEY);
+    console.log('Stored data:', stored);
     if (stored) {
-      setInitiatives(JSON.parse(stored));
+      try {
+        const parsed = JSON.parse(stored);
+        console.log('Parsed initiatives:', parsed);
+        setInitiatives(parsed);
+      } catch (error) {
+        console.error('Error parsing initiatives:', error);
+      }
     }
-  }, []);
+  }, [isClient]);
 
   // Save initiatives to local storage
   useEffect(() => {
+    if (!isClient) return;
+
+    console.log('Saving initiatives to local storage:', initiatives);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(initiatives));
-  }, [initiatives]);
+  }, [initiatives, isClient]);
 
   const handleSubmit = (initiativeData: Omit<Initiative, 'id' | 'createdAt' | 'updatedAt'>) => {
+    console.log('Submitting initiative data:', initiativeData);
     if (editingInitiative) {
       // Update existing initiative
       const updated = initiatives.map((i) =>
@@ -36,6 +56,7 @@ export default function Initiatives() {
             }
           : i
       );
+      console.log('Updating initiative:', updated);
       setInitiatives(updated);
     } else {
       // Create new initiative
@@ -45,6 +66,7 @@ export default function Initiatives() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
+      console.log('Creating new initiative:', newInitiative);
       setInitiatives((prev) => [...prev, newInitiative]);
     }
     setEditingInitiative(null);
@@ -61,6 +83,10 @@ export default function Initiatives() {
       setInitiatives((prev) => prev.filter((i) => i.id !== id));
     }
   };
+
+  if (!isClient) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div>

@@ -70,7 +70,7 @@ export default function InitiativeList({ initiatives, onEdit, onDelete }: Initia
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">
-                    {initiative.estimatedUplift > 0 ? '+' : ''}{initiative.estimatedUplift}%
+                    {initiative.uplift > 0 ? '+' : ''}{initiative.uplift}%
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
