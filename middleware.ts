@@ -3,47 +3,40 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export async function middleware(req: NextRequest) {
-  console.log('Middleware executing for path:', req.nextUrl.pathname);
-  
-  // Only run middleware for specific routes
-  const protectedPaths = ['/initiatives', '/capacity'];
-  const authPaths = ['/auth/login', '/auth/signup'];
-  const isProtectedPath = protectedPaths.some(path => req.nextUrl.pathname === path);
-  const isAuthPath = authPaths.some(path => req.nextUrl.pathname === path);
-
-  // If not a protected or auth path, skip middleware
-  if (!isProtectedPath && !isAuthPath) {
-    console.log('Not a protected or auth path, skipping middleware');
-    return NextResponse.next();
-  }
-
   const res = NextResponse.next();
   const supabase = createMiddlewareClient({ req, res });
-  const { data: { session } } = await supabase.auth.getSession();
 
-  console.log('Middleware - Current path:', req.nextUrl.pathname);
-  console.log('Middleware - Session:', session ? 'exists' : 'none');
-  console.log('Middleware - Protected Path:', isProtectedPath);
-  console.log('Middleware - Auth Path:', isAuthPath);
+  console.log('Middleware - Request path:', req.nextUrl.pathname);
 
-  // Handle protected routes
-  if (isProtectedPath && !session) {
-    console.log('Middleware - Redirecting to login (no session)');
-    return NextResponse.redirect(new URL('/auth/login', req.url));
+  // Check if the request is for a protected route
+  const isProtectedRoute = req.nextUrl.pathname.startsWith('/initiatives');
+  const isAuthRoute = req.nextUrl.pathname.startsWith('/auth');
+
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    console.log('Middleware - Session check:', { hasSession: !!session, error });
+
+    if (isProtectedRoute && !session) {
+      // Redirect to login if accessing protected route without session
+      console.log('Middleware - No session, redirecting to login');
+      const redirectUrl = new URL('/auth/login', req.url);
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    if (isAuthRoute && session) {
+      // Redirect to initiatives if accessing auth routes with session
+      console.log('Middleware - Has session, redirecting to initiatives');
+      const redirectUrl = new URL('/initiatives', req.url);
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    return res;
+  } catch (error) {
+    console.error('Middleware - Error:', error);
+    return res;
   }
-
-  // Handle auth routes
-  if (isAuthPath && session) {
-    console.log('Middleware - Redirecting to initiatives (has session)');
-    return NextResponse.redirect(new URL('/initiatives', req.url));
-  }
-
-  return res;
 }
 
-// Match all routes except static files and api
 export const config = {
-  matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
-  ],
+  matcher: ['/initiatives/:path*', '/auth/:path*']
 }; 

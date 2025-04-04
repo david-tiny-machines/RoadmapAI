@@ -10,16 +10,15 @@ export type ValueLever =
 
 export interface Initiative {
   id: string;
-  user_id: string;
+  user_id?: string; // Optional for local storage, required for Supabase
   name: string;
-  value_lever: string;
+  valueLever: ValueLever;
   uplift: number;
   confidence: number;
-  effort_estimate: number;
-  priority_score: number;
-  start_month: string | null;
-  end_month: string | null;
-  is_mandatory: boolean;
-  created_at: string;
-  updated_at: string;
+  effortEstimate: number;
+  isMandatory: boolean;
+  startMonth?: string;
+  endMonth?: string;
+  createdAt: string;
+  updatedAt: string;
 } 
