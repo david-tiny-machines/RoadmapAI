@@ -31,6 +31,21 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - v0.1.3a: First iteration of Phase 3, PRD complete
 - v1.0.0: First major release
 
+## [v0.0.3c]
+### Fixed
+- Backported fix from Phase 2: Initiative drag and drop prioritization now correctly maintains mandatory-before-optional ordering
+- Prevented mandatory initiatives from being moved below optional initiatives in priority list
+
+### Technical
+- Enhanced `handleDragEnd` function in InitiativeList component to enforce ordering constraints
+
+## [v0.0.3b] [REVERTED]
+### Note
+- Experimental version attempting to implement the full Phase 3 one-shot prompt from finish-phase-3.md
+- Attempted implementation of MetricInput, MetricChart, and ForecastDisplay components
+- Rolled back due to integration issues between forecast calculations and initiative data
+- Decision made to implement Phase 3 features incrementally instead of all at once
+
 ## [Unreleased - v0.0.3a]
 ### Added
 - Basic Supabase authentication integration
@@ -54,6 +69,22 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - Added Supabase client configuration
 - Implemented RLS policies for data security
 - Added TypeScript types for auth context
+
+### Known Issues
+- Initiative date range calculation in `utils/capacityUtils.ts` may fail if `monthlyCapacities` has fewer than three entries
+- Type safety issue in `CapacityChart.tsx` where `CapacityWarning` component uses `any[]` type instead of proper `MonthlyEffort` interface
+- Initiative list state in `InitiativeList.tsx` may become out of sync with parent's initiatives prop due to missing dependency array
+- Bulk update feature in `CapacityManager.tsx` lacks validation for negative numbers and invalid inputs
+
+## [v0.0.2b]
+### Fixed
+- Initiative drag and drop prioritization now correctly maintains mandatory-before-optional ordering
+- Prevented mandatory initiatives from being moved below optional initiatives
+- Ensured drag and drop behavior aligns with priority rules from PRD
+
+### Technical
+- Enhanced `handleDragEnd` function in InitiativeList component to enforce ordering constraints
+- Added validation check for mandatory-to-optional initiative moves
 
 ## [v0.0.2a]
 ### Added

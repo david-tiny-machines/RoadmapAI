@@ -230,10 +230,15 @@ export default function InitiativeList({ initiatives, onEdit, onDelete }: Initia
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
         
-        // Prevent dragging optional items above mandatory ones
         const draggedItem = items[oldIndex];
         const targetItem = items[newIndex];
-        if (!draggedItem.isMandatory && targetItem.isMandatory) {
+        
+        // Prevent dragging optional items above mandatory ones
+        // AND prevent dragging mandatory items below optional ones
+        const isMandatoryToOptionalMove = draggedItem.isMandatory && 
+          items.slice(0, newIndex + 1).some(item => !item.isMandatory);
+        
+        if ((!draggedItem.isMandatory && targetItem.isMandatory) || isMandatoryToOptionalMove) {
           return items;
         }
         
