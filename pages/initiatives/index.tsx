@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import InitiativeForm from '../../components/initiatives/InitiativeForm';
 import InitiativeList from '../../components/initiatives/InitiativeList';
 import { Initiative } from '../../types/initiative';
+import { sortInitiativesByPriority } from '../../utils/prioritizationUtils';
 
 const STORAGE_KEY = 'roadmapai_initiatives';
 
@@ -13,37 +14,34 @@ export default function Initiatives() {
 
   // Set isClient to true when component mounts
   useEffect(() => {
-    setIsClient(true);
+    const timeout = setTimeout(() => {
+      setIsClient(true);
+    }, 0);
+    return () => clearTimeout(timeout);
   }, []);
 
   // Load initiatives from local storage
   useEffect(() => {
     if (!isClient) return;
 
-    console.log('Loading initiatives from local storage');
-    const stored = localStorage.getItem(STORAGE_KEY);
-    console.log('Stored data:', stored);
-    if (stored) {
-      try {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
         const parsed = JSON.parse(stored);
-        console.log('Parsed initiatives:', parsed);
         setInitiatives(parsed);
-      } catch (error) {
-        console.error('Error parsing initiatives:', error);
       }
+    } catch (error) {
+      console.error('Error loading initiatives:', error);
     }
   }, [isClient]);
 
   // Save initiatives to local storage
   useEffect(() => {
     if (!isClient) return;
-
-    console.log('Saving initiatives to local storage:', initiatives);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(initiatives));
   }, [initiatives, isClient]);
 
   const handleSubmit = (initiativeData: Omit<Initiative, 'id' | 'createdAt' | 'updatedAt'>) => {
-    console.log('Submitting initiative data:', initiativeData);
     if (editingInitiative) {
       // Update existing initiative
       const updated = initiatives.map((i) =>
@@ -56,8 +54,7 @@ export default function Initiatives() {
             }
           : i
       );
-      console.log('Updating initiative:', updated);
-      setInitiatives(updated);
+      setInitiatives(sortInitiativesByPriority(updated));
     } else {
       // Create new initiative
       const newInitiative: Initiative = {
@@ -66,8 +63,7 @@ export default function Initiatives() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      console.log('Creating new initiative:', newInitiative);
-      setInitiatives((prev) => [...prev, newInitiative]);
+      setInitiatives((prev) => sortInitiativesByPriority([...prev, newInitiative]));
     }
     setEditingInitiative(null);
     setShowForm(false);
@@ -79,13 +75,18 @@ export default function Initiatives() {
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this initiative?')) {
-      setInitiatives((prev) => prev.filter((i) => i.id !== id));
-    }
+    setInitiatives((prev) => prev.filter((i) => i.id !== id));
   };
 
   if (!isClient) {
-    return <div>Loading...</div>;
+    return (
+      <div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Initiatives</h1>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

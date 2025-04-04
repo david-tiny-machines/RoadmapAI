@@ -7,12 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Auto-prioritization (upcoming)
-- Manual drag/drop functionality (upcoming)
-- Handling of mandatory items in prioritization (upcoming)
+- Implemented drag-and-drop functionality using @dnd-kit
+- Added priority score calculation and display
+- Added reset priority functionality with confirmation modal
+- Added delete initiative confirmation modal
+- Added mandatory item badges and visual distinction
+- Added date range display in initiative cards
+- Added clear explanation of priority calculation
+- Added prevention of dragging optional items above mandatory ones
 
 ### Changed
-- Moved storage testing page to `/dev/storage-debug` for development use
+- Improved initiative card layout and design
+- Enhanced visual hierarchy in initiative display
+- Updated priority calculation explanation to be more user-friendly
+- Optimized state management for drag-and-drop operations
+- Improved date formatting for better readability
+
+### Fixed
+- Fixed state stability issues during drag operations
+- Fixed initiative ordering when adding new items
+- Fixed visual feedback during drag operations
+- Fixed date display formatting
+
+### Technical
+- Migrated to @dnd-kit from react-beautiful-dnd
+- Added comprehensive JSDoc documentation
+- Improved type safety across components
+- Enhanced error handling for storage operations
+- Optimized component rendering performance
 
 ## [0.1.0] - 2025-04-04
 ### Added

@@ -23,17 +23,17 @@ export function getNextNMonths(n: number, startDate: Date = new Date()): string[
 }
 
 /**
- * Formats a month string into a human-readable format
- * @param {string} monthStr - Month string in YYYY-MM format
- * @returns {string} Formatted string in "MMM YYYY" format
- * 
- * @example
- * // Returns "Apr 2025"
- * formatMonthYear('2025-04')
+ * Formats a YYYY-MM date string into a more readable format
+ * @param {string} dateStr - Date string in YYYY-MM format
+ * @returns {string} Formatted date string (e.g., "Apr 2025")
  */
-export function formatMonthYear(monthStr: string): string {
-  const [year, month] = monthStr.split('-');
-  return new Date(`${year}-${month}-01`).toLocaleDateString('en-US', {
+export function formatMonthYear(dateStr: string): string {
+  if (!dateStr) return '';
+  
+  const [year, month] = dateStr.split('-');
+  const date = new Date(parseInt(year), parseInt(month) - 1);
+  
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     year: 'numeric'
   });

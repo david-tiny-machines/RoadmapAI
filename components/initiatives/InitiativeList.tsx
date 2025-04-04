@@ -1,122 +1,308 @@
-import { Initiative } from '../../types/initiative';
+'use client';
 
+import { Initiative } from '../../types/initiative';
+import { calculateWeightedImpact, calculatePriorityScore } from '../../utils/prioritizationUtils';
+import { formatMonthYear } from '../../utils/dateUtils';
+import { useState, useEffect } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+/**
+ * Props for the InitiativeList component
+ * @interface InitiativeListProps
+ * @property {Initiative[]} initiatives - Array of initiatives to display and manage
+ * @property {function} onEdit - Callback function when an initiative is edited
+ * @property {function} onDelete - Callback function when an initiative is deleted
+ */
 interface InitiativeListProps {
   initiatives: Initiative[];
   onEdit: (initiative: Initiative) => void;
   onDelete: (id: string) => void;
 }
 
-export default function InitiativeList({ initiatives, onEdit, onDelete }: InitiativeListProps) {
-  if (initiatives.length === 0) {
-    return (
-      <div className="text-center py-12 bg-white rounded-xl shadow-soft">
-        <p className="text-gray-500">No initiatives yet. Create one using the form above.</p>
-      </div>
-    );
-  }
+interface ConfirmModalProps {
+  isOpen: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+interface DeleteModalProps {
+  isOpen: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmModal({ isOpen, onConfirm, onCancel }: ConfirmModalProps) {
+  if (!isOpen) return null;
 
   return (
-    <div className="mt-8 overflow-hidden bg-white rounded-xl shadow-soft">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Initiative
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Value Lever
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Uplift
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Confidence
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Timeline
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Effort
-              </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {initiatives.map((initiative) => (
-              <tr key={initiative.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{initiative.name}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {initiative.isMandatory ? (
-                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm bg-white border border-gray-200">
-                      <span className="text-orange-500 mr-1">★</span>
-                      <span className="text-gray-700">Mandatory</span>
-                    </div>
-                  ) : (
-                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm bg-white border border-gray-200">
-                      <span className="text-gray-700">Optional</span>
-                    </div>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{initiative.valueLever}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
-                    {initiative.uplift > 0 ? '+' : ''}{initiative.uplift}%
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
-                    {initiative.confidence}%
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
-                    {initiative.startMonth || initiative.endMonth ? (
-                      <>
-                        {initiative.startMonth && (
-                          <span>{new Date(initiative.startMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
-                        )}
-                        {initiative.startMonth && initiative.endMonth && <span> → </span>}
-                        {initiative.endMonth && (
-                          <span>{new Date(initiative.endMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-gray-500">Not scheduled</span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{initiative.effortEstimate} days</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    onClick={() => onEdit(initiative)}
-                    className="text-blue-600 hover:text-blue-900 mr-4"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => onDelete(initiative.id)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+        <h4 className="text-lg font-medium text-gray-900 mb-2">Reset Priority Order?</h4>
+        <p className="text-gray-600 mb-6">
+          This will remove all manual ordering and sort initiatives based on their calculated priority scores. Mandatory items will remain at the top.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+          >
+            Reset Priority
+          </button>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function DeleteModal({ isOpen, onConfirm, onCancel }: DeleteModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+        <h4 className="text-lg font-medium text-gray-900 mb-2">Delete Initiative?</h4>
+        <p className="text-gray-600 mb-6">
+          Are you sure you want to delete this initiative? This action cannot be undone.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SortableItem({ item, onEdit, onDelete }: { 
+  item: Initiative; 
+  onEdit: (initiative: Initiative) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 1 : 0,
+  };
+
+  const handleDelete = () => {
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = () => {
+    onDelete(item.id);
+    setShowDeleteModal(false);
+  };
+
+  const weightedImpact = calculateWeightedImpact(item);
+  const priorityScore = calculatePriorityScore(item);
+
+  return (
+    <>
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`p-4 rounded-lg border mb-2 ${
+          item.isMandatory ? 'bg-yellow-50' : 'bg-white'
+        } ${isDragging ? 'shadow-lg' : ''}`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div
+              {...attributes}
+              {...listeners}
+              className="mr-3 cursor-move p-1 hover:bg-gray-100 rounded"
+            >
+              ⋮⋮
+            </div>
+            <div>
+              <div className="font-medium flex items-center">
+                {item.name}
+                {item.isMandatory && (
+                  <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
+                    Mandatory
+                  </span>
+                )}
+              </div>
+              <div className="text-sm text-gray-500">
+                {item.valueLever}
+                {(item.startMonth || item.endMonth) && (
+                  <span className="ml-2 text-gray-400">
+                    {item.startMonth && !item.endMonth && `From ${formatMonthYear(item.startMonth)}`}
+                    {!item.startMonth && item.endMonth && `Until ${formatMonthYear(item.endMonth)}`}
+                    {item.startMonth && item.endMonth && `${formatMonthYear(item.startMonth)} to ${formatMonthYear(item.endMonth)}`}
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">
+                Priority Score: {priorityScore.toFixed(2)} • 
+                Effort: {item.effortEstimate} days • 
+                Impact: {weightedImpact.toFixed(2)}%
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onEdit(item)}
+              className="text-indigo-600 hover:text-indigo-900"
+            >
+              Edit
+            </button>
+            <button
+              onClick={handleDelete}
+              className="text-red-600 hover:text-red-900"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+      <DeleteModal
+        isOpen={showDeleteModal}
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteModal(false)}
+      />
+    </>
+  );
+}
+
+export default function InitiativeList({ initiatives, onEdit, onDelete }: InitiativeListProps) {
+  const [items, setItems] = useState<Initiative[]>([]);
+  const [showResetModal, setShowResetModal] = useState(false);
+  
+  useEffect(() => {
+    setItems(initiatives);
+  }, [initiatives]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      setItems((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        
+        // Prevent dragging optional items above mandatory ones
+        const draggedItem = items[oldIndex];
+        const targetItem = items[newIndex];
+        if (!draggedItem.isMandatory && targetItem.isMandatory) {
+          return items;
+        }
+        
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  }
+
+  const handleReset = () => {
+    // Sort by mandatory first, then by priority score
+    const sortedItems = [...initiatives].sort((a, b) => {
+      if (a.isMandatory !== b.isMandatory) {
+        return a.isMandatory ? -1 : 1;
+      }
+      const scoreA = calculatePriorityScore(a);
+      const scoreB = calculatePriorityScore(b);
+      return scoreB - scoreA;
+    });
+    setItems(sortedItems);
+    setShowResetModal(false);
+  };
+
+  return (
+    <div className="mt-8">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h3 className="text-lg font-medium text-gray-900">
+            Prioritised Initiatives 
+            <span className="text-sm text-gray-500 ml-2">({items.length} items)</span>
+          </h3>
+          <p className="text-sm text-gray-500 mt-1">
+            Priority is calculated based on potential impact and confidence, balanced against effort required. Higher impact and confidence increase priority, while higher effort decreases it. Mandatory items always appear first.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowResetModal(true)}
+          className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+        >
+          Reset Priority
+        </button>
+      </div>
+
+      <ConfirmModal
+        isOpen={showResetModal}
+        onConfirm={handleReset}
+        onCancel={() => setShowResetModal(false)}
+      />
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={items.map(item => item.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="bg-white rounded-xl shadow-soft">
+            {items.map((item) => (
+              <SortableItem
+                key={item.id}
+                item={item}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 } 
