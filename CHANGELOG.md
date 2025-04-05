@@ -31,6 +31,46 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - v0.1.3a: First iteration of Phase 3, PRD complete
 - v1.0.0: First major release
 
+## [v0.0.3e]
+### Added
+- Chart visualization for historical metrics:
+  - Line charts for each metric type with proper formatting
+  - Interactive tooltips showing exact values
+  - Date range selection with preset options (3M, 6M, 1Y, All)
+  - Custom date range selection
+  - Toggle controls for data points and grid lines
+  - View switching between table and chart formats
+
+### Changed
+- Enhanced metric display:
+  - Y-axis formatting specific to each metric type:
+    - Conversion and Interest Rate shown as percentages
+    - Average Loan Size shown in currency format
+  - X-axis shows months in MMM YYYY format
+  - Chart automatically adjusts scale based on date range
+  - Settings persist when switching between views
+
+### Technical
+- New components:
+  - `MetricChart.tsx` for line chart visualization
+  - `DateRangeSelector.tsx` for date range controls
+  - `ChartControls.tsx` for visualization options
+- Updated existing components:
+  - Enhanced `MetricTable.tsx` with view switching
+  - Modified `metrics/index.tsx` to handle chart state
+- Verified through comprehensive test plan:
+  - Test 1.1-1.2: Chart rendering and tooltips
+  - Test 2.1-2.2: Date range selection
+  - Test 3.1-3.2: Chart controls
+  - Test 4.1: View integration
+
+### Known Limitations
+- Y-axis scale is fixed for each metric type
+- No ability to zoom into specific regions
+- Cannot compare multiple metrics on same chart
+- Limited to monthly data points
+- No data export functionality
+
 ## [v0.0.3d]
 ### Added
 - Complete historical metrics functionality:

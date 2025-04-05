@@ -3,14 +3,28 @@ import { createClient } from '@supabase/supabase-js';
 import MetricInput from '../../components/metrics/MetricInput';
 import MetricTabs from '../../components/metrics/MetricTabs';
 import MetricTable from '../../components/metrics/MetricTable';
+import MetricChart from '../../components/metrics/MetricChart';
+import DateRangeSelector from '../../components/metrics/DateRangeSelector';
+import ChartControls from '../../components/metrics/ChartControls';
 import { HistoricalMetric } from '../../types/metrics';
 import { DbMetricType } from '../../types/database';
+
+type ViewMode = 'table' | 'chart';
 
 export default function MetricsPage() {
   const [metrics, setMetrics] = useState<HistoricalMetric[]>([]);
   const [activeTab, setActiveTab] = useState<DbMetricType>('conversion');
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showDataPoints, setShowDataPoints] = useState(true);
+  const [showGrid, setShowGrid] = useState(true);
+  const [dateRange, setDateRange] = useState(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setMonth(end.getMonth() - 6); // Default to 6 months
+    return { start, end };
+  });
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,7 +67,12 @@ export default function MetricsPage() {
     setError(error.message);
   };
 
-  const filteredMetrics = metrics.filter(metric => metric.type === activeTab);
+  const filteredMetrics = metrics
+    .filter(metric => metric.type === activeTab)
+    .filter(metric => {
+      const date = new Date(metric.month);
+      return date >= dateRange.start && date <= dateRange.end;
+    });
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -76,7 +95,32 @@ export default function MetricsPage() {
 
       <div className="bg-white rounded-lg shadow">
         <div className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Existing Metrics</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-semibold">Existing Metrics</h2>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setViewMode('table')}
+                className={`px-3 py-1 text-sm rounded-md ${
+                  viewMode === 'table'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Table
+              </button>
+              <button
+                onClick={() => setViewMode('chart')}
+                className={`px-3 py-1 text-sm rounded-md ${
+                  viewMode === 'chart'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Chart
+              </button>
+            </div>
+          </div>
+
           {isLoading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -84,8 +128,41 @@ export default function MetricsPage() {
           ) : (
             <>
               <MetricTabs activeTab={activeTab} onTabChange={setActiveTab} />
-              <div className="mt-4">
-                <MetricTable metrics={filteredMetrics} metricType={activeTab} />
+              
+              <div className="mt-4 space-y-4">
+                <DateRangeSelector
+                  startDate={dateRange.start}
+                  endDate={dateRange.end}
+                  onChange={setDateRange}
+                  minDate={new Date(Math.min(...metrics.map(m => m.month.getTime())))}
+                  maxDate={new Date(Math.max(...metrics.map(m => m.month.getTime())))}
+                />
+
+                {viewMode === 'chart' && (
+                  <div className="space-y-4">
+                    <ChartControls
+                      showDataPoints={showDataPoints}
+                      showGrid={showGrid}
+                      onToggleDataPoints={() => setShowDataPoints(!showDataPoints)}
+                      onToggleGrid={() => setShowGrid(!showGrid)}
+                    />
+                    <MetricChart
+                      metrics={filteredMetrics}
+                      metricType={activeTab}
+                      dateRange={dateRange}
+                      onDateRangeChange={setDateRange}
+                      showDataPoints={showDataPoints}
+                      showGrid={showGrid}
+                    />
+                  </div>
+                )}
+
+                {viewMode === 'table' && (
+                  <MetricTable
+                    metrics={filteredMetrics}
+                    metricType={activeTab}
+                  />
+                )}
               </div>
             </>
           )}

@@ -1,39 +1,39 @@
 # Completing Phase 3: Forecasting Engine & Data Infrastructure
 
-## Current Focus (Testing Phase)
-We are currently testing the basic metrics functionality that has been implemented:
-- Verifying MetricInput component works correctly
-- Testing metrics page data loading and display
-- Checking date handling between frontend and Supabase
-- Validating error handling and form validation
+## Current Focus (Visualization Phase - v0.0.3e)
+We have completed the basic metrics functionality in v0.0.3d:
+✅ MetricInput component working correctly
+✅ Metrics page data loading and display
+✅ Date handling between frontend and Supabase
+✅ Error handling and form validation
+✅ Tabbed interface for metric organization
 
-Recent fixes:
-- **Historical metrics date handling improvements**:
-  - Fixed month selection to only show previous months (not current/future)
-  - Updated metrics components to use proper Date objects internally 
-  - Added new utility functions in dateUtils.ts for date conversions
-  - Ensured correct formatting between UI (month/year only) and database (DATE format)
-  - Maintained user-friendly display without exposing day-level granularity
+Next focus for v0.0.3e: Implementing metric visualization
+- Create MetricChart component using Recharts
+- Show historical data in line chart format
+- Add interactive features (tooltips, legends)
+- Implement date range selection
 
-Once testing is complete, we will proceed with implementing the MetricChart component.
-
-## Current Status (v0.0.3a)
+## Current Status (v0.0.3d)
 ✅ Completed:
 - Basic authentication with Supabase
 - User profile management
 - Database schema setup
-- Data persistence layer for users and initiatives
+- Data persistence layer
 - Basic metrics infrastructure:
   - Database schema for historical_metrics
   - MetricInput component for data entry
-  - Basic metrics page with table view
-  - RLS policies for admin-only modifications
+  - Tabbed metrics page with type-specific views
+  - RLS policies for data security
+  - Proper date and timezone handling
+  - Financial data validation
 
 ❌ Missing:
 1. Historical Metrics Features
-   - ✅ Upload/input interface for historical metrics
-   - ✅ Storage and retrieval of metric history
-   - ❌ Metric visualization (charts)
+   - ✅ Upload/input interface
+   - ✅ Storage and retrieval
+   - ✅ Type-specific organization
+   - ❌ Metric visualization (charts) <- NEXT FOCUS (v0.0.3e)
    - ❌ API endpoints for metric management
 
 2. Forecasting Engine
@@ -42,9 +42,9 @@ Once testing is complete, we will proceed with implementing the MetricChart comp
    - ❌ Uplift visualization against baseline
 
 3. Business Metrics Tracking
-   - ✅ Basic conversion rate tracking
-   - ✅ Basic loan size tracking
-   - ✅ Basic interest rate tracking
+   - ✅ Conversion rate tracking
+   - ✅ Loan size tracking
+   - ✅ Interest rate tracking
    - ❌ Metric history views with charts
    - ❌ Trend analysis
 
@@ -71,9 +71,10 @@ Once testing is complete, we will proceed with implementing the MetricChart comp
 ✅ Completed:
 - Historical metric input form
 - Basic metric management interface
+- Tabbed metric type organization
 
 ❌ Still Needed:
-- Metric visualization charts
+- Metric visualization charts (v0.0.3e)
 - Forecast display components
 - Enhanced metric management interface
 
@@ -85,16 +86,17 @@ Once testing is complete, we will proceed with implementing the MetricChart comp
 
 ## Revised Implementation Order
 
-1. **Metric Visualization (Current Focus)**
+1. **Metric Visualization (v0.0.3e - Current Focus)**
    - Create MetricChart component using Recharts
    - Implement proper date handling per fix-date.md
    - Add type selection and date range controls
    - Add interactive tooltips and legends
 
    **Metrics improvements needed:**
-   - Improve date formatting with a dedicated library (date-fns)
-   - Add client-side validation for type/month unique constraint
-   - Add form validation to handle potential duplicate entries
+   - Add date range filtering
+   - Implement chart-specific number formatting
+   - Add loading states for chart data
+   - Handle empty/sparse data gracefully
 
 2. **Forecasting Foundation**
    - Create ForecastDisplay component
