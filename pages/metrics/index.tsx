@@ -6,10 +6,12 @@ import MetricTable from '../../components/metrics/MetricTable';
 import MetricChart from '../../components/metrics/MetricChart';
 import DateRangeSelector from '../../components/metrics/DateRangeSelector';
 import ChartControls from '../../components/metrics/ChartControls';
+import { ForecastDisplay } from '../../components/metrics/ForecastDisplay';
+import { ForecastControls } from '../../components/metrics/ForecastControls';
 import { HistoricalMetric } from '../../types/metrics';
 import { DbMetricType } from '../../types/database';
 
-type ViewMode = 'table' | 'chart';
+type ViewMode = 'table' | 'chart' | 'forecast';
 
 export default function MetricsPage() {
   const [metrics, setMetrics] = useState<HistoricalMetric[]>([]);
@@ -19,6 +21,8 @@ export default function MetricsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showDataPoints, setShowDataPoints] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
+  const [forecastMonths, setForecastMonths] = useState(6);
+  const [showConfidenceBands, setShowConfidenceBands] = useState(true);
   const [dateRange, setDateRange] = useState(() => {
     const end = new Date();
     const start = new Date();
@@ -70,6 +74,9 @@ export default function MetricsPage() {
   const filteredMetrics = metrics
     .filter(metric => metric.type === activeTab)
     .filter(metric => {
+      if (viewMode === 'forecast') {
+        return true;
+      }
       const date = new Date(metric.month);
       return date >= dateRange.start && date <= dateRange.end;
     });
@@ -118,6 +125,16 @@ export default function MetricsPage() {
               >
                 Chart
               </button>
+              <button
+                onClick={() => setViewMode('forecast')}
+                className={`px-3 py-1 text-sm rounded-md ${
+                  viewMode === 'forecast'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Forecast
+              </button>
             </div>
           </div>
 
@@ -130,13 +147,15 @@ export default function MetricsPage() {
               <MetricTabs activeTab={activeTab} onTabChange={setActiveTab} />
               
               <div className="mt-4 space-y-4">
-                <DateRangeSelector
-                  startDate={dateRange.start}
-                  endDate={dateRange.end}
-                  onChange={setDateRange}
-                  minDate={new Date(Math.min(...metrics.map(m => m.month.getTime())))}
-                  maxDate={new Date(Math.max(...metrics.map(m => m.month.getTime())))}
-                />
+                {viewMode !== 'forecast' && (
+                  <DateRangeSelector
+                    startDate={dateRange.start}
+                    endDate={dateRange.end}
+                    onChange={setDateRange}
+                    minDate={new Date(Math.min(...metrics.map(m => m.month.getTime())))}
+                    maxDate={new Date(Math.max(...metrics.map(m => m.month.getTime())))}
+                  />
+                )}
 
                 {viewMode === 'chart' && (
                   <div className="space-y-4">
@@ -153,6 +172,23 @@ export default function MetricsPage() {
                       onDateRangeChange={setDateRange}
                       showDataPoints={showDataPoints}
                       showGrid={showGrid}
+                    />
+                  </div>
+                )}
+
+                {viewMode === 'forecast' && (
+                  <div className="space-y-4">
+                    <ForecastControls
+                      forecastMonths={forecastMonths}
+                      onForecastMonthsChange={setForecastMonths}
+                      showConfidenceBands={showConfidenceBands}
+                      onToggleConfidenceBands={() => setShowConfidenceBands(!showConfidenceBands)}
+                    />
+                    <ForecastDisplay
+                      metrics={filteredMetrics}
+                      metricType={activeTab}
+                      forecastMonths={forecastMonths}
+                      showConfidenceBands={showConfidenceBands}
                     />
                   </div>
                 )}

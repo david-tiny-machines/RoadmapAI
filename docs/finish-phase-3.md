@@ -33,11 +33,11 @@ Next focus for v0.0.3e: Implementing metric visualization
    - ✅ Upload/input interface
    - ✅ Storage and retrieval
    - ✅ Type-specific organization
-   - ❌ Metric visualization (charts) <- NEXT FOCUS (v0.0.3e)
-   - ❌ API endpoints for metric management
+   - ✅ Metric visualization (charts)
+   - ❌ Forecast integration
 
 2. Forecasting Engine
-   - ❌ Baseline metric visualization
+   - ✅ Baseline metric visualization
    - ❌ Forecast calculation logic
    - ❌ Uplift visualization against baseline
 
@@ -45,7 +45,7 @@ Next focus for v0.0.3e: Implementing metric visualization
    - ✅ Conversion rate tracking
    - ✅ Loan size tracking
    - ✅ Interest rate tracking
-   - ❌ Metric history views with charts
+   - ✅ Metric history views with charts
    - ❌ Trend analysis
 
 ## Implementation Plan
@@ -58,23 +58,25 @@ Next focus for v0.0.3e: Implementing metric visualization
 ❌ Still Needed:
 - Implement metric aggregation functions
 
-### 2. Backend API
+### 2. Data Access Layer
 ✅ Completed:
 - Basic Supabase integration for metrics
+- Direct database access setup
+- Type-safe query handling
 
 ❌ Still Needed:
-- Create metric upload endpoints
-- Implement forecast calculation endpoints
-- Add metric retrieval and filtering
+- Implement forecast calculations
+- Add metric aggregation support
+- Enhanced filtering and retrieval
 
 ### 3. Frontend Components
 ✅ Completed:
 - Historical metric input form
 - Basic metric management interface
 - Tabbed metric type organization
+- Metric visualization charts
 
 ❌ Still Needed:
-- Metric visualization charts (v0.0.3e)
 - Forecast display components
 - Enhanced metric management interface
 
@@ -86,27 +88,21 @@ Next focus for v0.0.3e: Implementing metric visualization
 
 ## Revised Implementation Order
 
-1. **Metric Visualization (v0.0.3e - Current Focus)**
+1. **Metric Visualization (v0.0.3e - ✅ Completed)**
    - Create MetricChart component using Recharts
    - Implement proper date handling per fix-date.md
    - Add type selection and date range controls
    - Add interactive tooltips and legends
 
-   **Metrics improvements needed:**
-   - Add date range filtering
-   - Implement chart-specific number formatting
-   - Add loading states for chart data
-   - Handle empty/sparse data gracefully
-
-2. **Forecasting Foundation**
+2. **Forecasting Foundation (v0.0.3f - Next Focus)**
    - Create ForecastDisplay component
    - Implement basic forecast calculations
    - Add initiative impact visualization
 
-3. **API and Data Layer**
+3. **Data Layer Enhancements**
    - Add metric aggregation functions
-   - Create forecast calculation endpoints
-   - Implement metric filtering and retrieval
+   - Implement forecast calculations
+   - Enhanced filtering and retrieval
 
 4. **Integration and Polish**
    - Connect forecasts to initiatives
@@ -136,10 +132,11 @@ Implement the forecasting engine and historical metrics tracking for RoadmapAI P
 - Cumulative uplift calculation
 - Date range controls
 
-4. Create pages/api/metrics/[...].ts endpoints:
-- POST /api/metrics/upload for batch metric upload
-- GET /api/metrics/history for retrieving metric history
-- GET /api/metrics/forecast for calculating forecasts
+4. Create utils/forecasting.ts:
+- Forecast calculation utilities
+- Metric aggregation helpers
+- Date handling functions
+- Data validation
 
 5. Create pages/metrics/index.tsx:
 - Metric management dashboard
@@ -169,7 +166,7 @@ Follow existing patterns:
 - TailwindCSS for styling
 - TypeScript for type safety
 - React hooks for state
-- Next.js API routes
+- Direct Supabase queries
 ```
 
 ## Success Criteria

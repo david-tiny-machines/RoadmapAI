@@ -177,9 +177,24 @@ Over time, RoadmapAI could evolve into an integrated agent network designed to a
 - Surface trends by region or vertical
 - Suggest initiative ideas and estimated impact ranges
 
+## Next Steps
+- Add initiative impact overlays
+- Implement forecast vs actual tracking
+- Enhance forecasting capabilities:
+  - Add multiple forecasting models (e.g., exponential, weighted moving average, seasonal)
+  - Allow manual adjustments to forecasted values
+  - Support override of individual forecast points
+  - Add model comparison and accuracy tracking
+  - Include confidence interval customization
+- Support seasonal pattern recognition
+- Add forecast export/import functionality
+- Integrate with initiatives (Phase 4)
+
 ## ❓ Open Questions
 - How should the tool handle over-capacity when mandatory items are included?
 - Should levers have diminishing returns or caps?
 - Can confidence scoring be AI-assisted?
 - Do we need role-based capacity tracking or is total team capacity sufficient?
+- Which additional forecasting models would be most valuable for the business?
+- Should manual forecast adjustments require approval or documentation?
 

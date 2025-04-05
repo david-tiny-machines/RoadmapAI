@@ -31,6 +31,42 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - v0.1.3a: First iteration of Phase 3, PRD complete
 - v1.0.0: First major release
 
+## [v0.0.3f]
+### Added
+- Forecasting capabilities for historical metrics:
+  - Linear regression-based trend calculation
+  - Forecast projection for 3M, 6M, or 1Y periods
+  - Confidence interval bands with toggle
+  - Visual distinction between historical and projected data
+  - Automatic date range handling (3 months historical + forecast period)
+
+### Changed
+- Enhanced metric visualization:
+  - Dedicated forecast view alongside table and chart views
+  - Line-style legend indicators for better visualization
+  - Proper scaling and formatting maintained for each metric type
+  - Historical data limited to 3 months in forecast view for clarity
+
+### Technical
+- New components:
+  - `ForecastDisplay.tsx` for forecast visualization
+  - `ForecastControls.tsx` for forecast period and confidence band controls
+  - `forecastUtils.ts` for trend calculation and projection
+- Updated existing components:
+  - Modified `metrics/index.tsx` to handle forecast view
+  - Enhanced date handling for future projections
+- Verified through comprehensive test plan:
+  - Test 1.1-1.2: Basic forecast rendering and controls
+  - Test 2.1-2.2: Trend calculation and edge cases
+  - Test 3.1: View mode integration
+
+### Known Limitations
+- Single forecasting model (linear regression only)
+- No manual adjustment of forecasted values
+- No seasonal adjustments
+- No initiative impact integration
+- No forecast data persistence
+
 ## [v0.0.3e]
 ### Added
 - Chart visualization for historical metrics:
