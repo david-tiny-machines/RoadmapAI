@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Initiative, DbValueLever, VALUE_LEVER_DISPLAY } from '../../types/database';
-import { supabase } from '../../utils/supabase';
+import { Initiative, DbValueLever, VALUE_LEVER_DISPLAY, DbInitiativeType } from '../../types/database';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import { Database } from '../../types/supabase';
 import { fromMonthString, formatDateToYYYYMMDD } from '../../utils/dateUtils';
 import { calculatePriorityScore } from '../../utils/prioritizationUtils';
+import ErrorDisplay from '../shared/ErrorDisplay';
 
 interface InitiativeFormProps {
   onSave: () => void;
@@ -13,6 +15,7 @@ interface InitiativeFormProps {
 
 export default function InitiativeForm({ onSave, onCancel, initialData }: InitiativeFormProps) {
   const { user } = useAuth();
+  const supabaseClient = useSupabaseClient<Database>();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<Initiative>(() => ({
@@ -78,7 +81,10 @@ export default function InitiativeForm({ onSave, onCancel, initialData }: Initia
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !supabaseClient) {
+       setError('Cannot save initiative: User or database connection is unavailable.');
+       return;
+    }
 
     // Validate all form fields
     const validationError = validateForm(formData);
@@ -129,25 +135,25 @@ export default function InitiativeForm({ onSave, onCancel, initialData }: Initia
           effortEstimate: effortEstimateNum,
       });
 
-      const { error } = await supabase
+      const { error: dbError } = await supabaseClient
         .from('initiatives')
         .upsert({
           id: formData.id,
           user_id: user.id,
           name: formData.name,
           value_lever: formData.valueLever,
-          uplift: upliftNum, // Send parsed number
-          confidence: confidenceNum, // Send parsed number
-          effort_estimate: effortEstimateInt, // Send rounded integer
+          uplift: upliftNum,
+          confidence: confidenceNum,
+          effort_estimate: effortEstimateInt,
           start_month: startMonthFormatted,
           end_month: endMonthFormatted,
           is_mandatory: formData.isMandatory,
           created_at: initialData ? undefined : formData.createdAt,
           updated_at: new Date().toISOString(),
           priority_score: priorityScore,
-        });
+        } as DbInitiativeType);
 
-      if (error) throw error;
+      if (dbError) throw dbError;
       onSave();
     } catch (error) {
       console.error('Error saving initiative:', error);
@@ -210,21 +216,7 @@ export default function InitiativeForm({ onSave, onCancel, initialData }: Initia
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
-          <div className="flex">
-            <div className="py-1">
-              <svg className="fill-current h-6 w-6 text-red-500 mr-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"/>
-              </svg>
-            </div>
-            <div>
-              <p className="font-bold">Error Saving Initiative</p>
-              <p className="text-sm">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {error && <ErrorDisplay message={error} onClose={() => setError(null)} />}
 
       <div>
         <label htmlFor="name" className="block text-sm font-medium text-gray-700">

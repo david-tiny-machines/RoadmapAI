@@ -31,7 +31,32 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - v0.1.3a: First iteration of Phase 3, PRD complete
 - v1.0.0: First major release
 
-## [v0.0.3h] - YYYY-MM-DD
+## [v0.0.3i] - 2025-04-06
+### Added
+- Added database constraint `confidence_range` (0-100) to `initiatives` table.
+- Added "Metrics" link to main application navigation header.
+
+### Changed
+- Refactored Supabase client usage across multiple components (`AuthProvider`, `InitiativeList`, `InitiativeForm`, `MetricInput`, `MetricsPage`, `CapacityManager`) to consistently use `useSupabaseClient` / `useSessionContext` hooks, removing direct client imports/creations.
+- Updated `calculateMonthlyEffort` in `capacityUtils.ts` to correctly handle default end dates (use last month of capacity window) and normalize date comparisons, ensuring effort calculation covers the full display period.
+- Standardized display of asynchronous operation errors using a shared `ErrorDisplay` component across Initiatives, Metrics, Capacity, and Auth pages.
+- Set `REPLICA IDENTITY FULL` for `initiatives` table in Supabase database.
+
+### Fixed
+- Capacity chart not displaying initiative effort due to missing data fetch in `pages/capacity/index.tsx`.
+- Runtime error on Metrics page (`Cannot convert undefined or null to object`) caused by missing `METRIC_TYPE_DISPLAY` mapping.
+- "Multiple GoTrueClient instances detected" console warning.
+- Console warning "Received NaN for the 'value' attribute" when clearing the value field in `MetricInput`.
+- Real-time UI updates not occurring after deleting an initiative due to missing Supabase replication for DELETE events.
+- Type mismatch for `historical_metrics.id` (expected `string`, was `number`) in `HistoricalMetric` interface.
+- Type mismatch for `historical_metrics.type` (`average_loan_size` vs `loan_size`) during Supabase insert.
+- Missing `priority_score` field in `DbInitiativeType` interface definition.
+- Corrected various import paths and type definitions related to the above fixes.
+
+### Known Issues (New)
+- Chart.js console warning: "Tried to use the 'fill' option without the 'Filler' plugin enabled..." appears on metrics forecast view. Requires investigation into Recharts/Chart.js plugin registration.
+
+## [v0.0.3h] - 2025-04-05
 ### Added
 - Created Supabase table `monthly_capacity` to store user-specific available working days per month.
 - Implemented Row Level Security (RLS) policies for `monthly_capacity` (Users manage their own).
@@ -56,9 +81,9 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - Removed redundant top-level `id` and `updatedAt` fields from the frontend `CapacityData` type.
 
 ### Known Issues
-- Capacity page: The `CapacityChart` does not display initiative effort (Mandatory/Optional Effort bars) because the parent page component is not fetching initiative data from Supabase after the v0.0.3g migration. Initiative data needs to be fetched and passed down as a prop to `CapacityManager`.
+- *Removed resolved issue: Capacity chart not displaying initiative effort.*
 
-## [v0.0.3g] - 2025-04-06
+## [v0.0.3g] - 2025-04-05
 ### Added
 - Migrated initiative data storage from local storage to Supabase `initiatives` table.
 - Added `user_id` foreign key relationship to initiatives.
@@ -205,8 +230,6 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
   - Test 5.2: Improved financial data validation
 
 ### Known Issues
-- Multiple GoTrueClient instances warning in console
-- Inconsistent error handling patterns across components
 - Some components still need timezone handling fixes (inherited from v0.0.3c)
 
 ## [v0.0.3c]
@@ -258,9 +281,6 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - Updated components to handle database/display type conversion
 
 ### Known Issues
-- Initiative date range calculation in `utils/capacityUtils.ts` may fail if `monthlyCapacities` has fewer than three entries
-- Type safety issue in `CapacityChart.tsx` where `CapacityWarning` component uses `any[]` type instead of proper `MonthlyEffort` interface
-- Initiative list state in `InitiativeList.tsx` may become out of sync with parent's initiatives prop due to missing dependency array
 - Bulk update feature in `CapacityManager.tsx` lacks validation for negative numbers and invalid inputs
 - Date format mismatch between application and database:
   - App uses string format ('YYYY-MM') while Supabase uses DATE type
@@ -268,12 +288,6 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
   - Risk of data inconsistency and comparison issues
   - Requires standardization to use proper DATE types internally while maintaining month/year-only UI
   - Note: Fixed for metrics, still needed for other components
-- Timezone handling issues in date-related components:
-  - `CapacityManager.tsx` uses toISOString() for dates which may cause timezone shifts
-  - `InitiativeForm.tsx` month selection may be affected by timezone conversion
-  - These components need the same date handling fix applied to MetricInput
-  - Impact: Dates might shift by one day depending on user's timezone
-  - Workaround: Use explicit YYYY-MM-DD string format instead of toISOString()
 - Schema/implementation mismatch for initiatives:
   - Current schema.sql defines initiatives table with UUID keys, user_id foreign keys, and database-computed priority scores
   - Current implementation uses local storage with string IDs, no user association, and client-computed scores
@@ -286,9 +300,7 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - Value lever and metric type overlap:
   - While display/database conversion is now handled, architectural decision needed on shared business logic
   - Consider unifying calculation and validation logic for shared metrics/levers
-- Missing database constraints for initiative fields:
-  - `confidence` should be limited to 0-100
-  - `effort_estimate` should be positive
+- Missing database constraints for initiative fields (`effort_estimate` should be positive).
 - Inconsistent timestamp handling between database and application:
   - Database uses TIMESTAMPTZ while application uses string types
   - No standardized approach to timezone handling across components
@@ -296,21 +308,6 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - Generic error handling doesn't provide specific feedback for different error types
 - Admin-only metrics functionality exists in database but admin interface is planned for Phase 6
 - Database constraint forces metric values to be ≥ 0, which may not support negative interest rates in the future
-- Multiple Supabase GoTrueClient instances detected in browser console:
-  - Console warnings indicate authentication client is initialized multiple times
-  - May lead to inefficient resource usage and potential race conditions
-  - Should be refactored to use a single, application-wide authentication client
-- NaN warning in MetricInput component:
-  - Console warning "Received NaN for the 'value' attribute" when deleting the value in the input field
-  - Issue caused by parseFloat() on empty string returning NaN in onChange handler
-  - Form validation works but creates console warnings
-  - Should handle empty string case before parsing to number
-- Inconsistent error handling patterns across components:
-  - Initiatives use modal dialogs for errors and confirmations
-  - Metrics use inline error messages
-  - Auth pages use inline error messages
-  - Form components use inline validation errors
-  - Not a functional issue, but creates inconsistent UX
 
 ## [v0.0.2b]
 ### Fixed

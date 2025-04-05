@@ -22,6 +22,13 @@ export const VALUE_LEVER_DISPLAY: Record<DbValueLever, string> = {
   bau: 'Business as usual (BAU)'
 };
 
+// Add Display mapping for Metric Types
+export const METRIC_TYPE_DISPLAY: Record<DbMetricType, string> = {
+  conversion: 'Conversion Rate',
+  average_loan_size: 'Average Loan Size',
+  interest_rate: 'Interest Rate'
+};
+
 // Utility functions
 export function getValueLeverDisplay(lever: DbValueLever): string {
   return VALUE_LEVER_DISPLAY[lever];
@@ -47,6 +54,7 @@ export interface DbInitiativeType {
   is_mandatory: boolean;
   created_at: string;
   updated_at: string;
+  priority_score: number;
 }
 
 export interface DbCapacityType {
@@ -90,6 +98,7 @@ export function toDbInitiative(initiative: Initiative): DbInitiativeType {
     is_mandatory: initiative.isMandatory,
     created_at: initiative.createdAt,
     updated_at: initiative.updatedAt,
+    priority_score: 0, // Assuming a default value, actual implementation needed
   };
 }
 

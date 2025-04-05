@@ -1,6 +1,14 @@
 -- Create ENUMs
 CREATE TYPE metric_type AS ENUM ('conversion', 'loan_size', 'interest_rate');
 CREATE TYPE user_role AS ENUM ('admin', 'user');
+CREATE TYPE value_lever AS ENUM (
+  'conversion',
+  'average_loan_size',
+  'interest_rate',
+  'customer_acquisition',
+  'customer_retention',
+  'bau'
+);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -91,7 +99,7 @@ CREATE TABLE IF NOT EXISTS initiatives (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID NOT NULL,
   name TEXT NOT NULL,
-  value_lever TEXT NOT NULL,
+  value_lever value_lever NOT NULL,
   uplift NUMERIC NOT NULL,
   confidence INTEGER NOT NULL,
   effort_estimate INTEGER NOT NULL,
@@ -138,6 +146,51 @@ CREATE POLICY "Users can delete their own initiatives"
 CREATE TRIGGER update_initiatives_updated_at
   BEFORE UPDATE ON initiatives
   FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Create monthly_capacity table
+CREATE TABLE public.monthly_capacity (
+  id uuid NOT NULL default extensions.uuid_generate_v4(),
+  user_id uuid NOT NULL,
+  month date NOT NULL,
+  available_days integer NOT NULL,
+  created_at timestamp with time zone NOT NULL default now(),
+  updated_at timestamp with time zone NOT NULL default now(),
+  constraint monthly_capacity_pkey PRIMARY KEY (id),
+  constraint unique_user_month_capacity unique (user_id, month),
+  constraint monthly_capacity_user_id_fkey foreign KEY (user_id) references auth.users (id) on delete CASCADE,
+  constraint positive_capacity check ((available_days >= 0))
+) TABLESPACE pg_default;
+
+-- Create index for monthly_capacity
+CREATE INDEX IF NOT EXISTS idx_monthly_capacity_user_month ON public.monthly_capacity USING btree (user_id, month) TABLESPACE pg_default;
+
+-- Add RLS policies for monthly_capacity
+ALTER TABLE monthly_capacity ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own capacity" ON monthly_capacity
+  FOR SELECT
+  TO public
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own capacity" ON monthly_capacity
+  FOR INSERT
+  TO public
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own capacity" ON monthly_capacity
+  FOR UPDATE
+  TO public
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own capacity" ON monthly_capacity
+  FOR DELETE
+  TO public
+  USING (auth.uid() = user_id);
+
+-- Create trigger for monthly_capacity updated_at
+CREATE TRIGGER update_monthly_capacity_updated_at BEFORE UPDATE ON monthly_capacity FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
 

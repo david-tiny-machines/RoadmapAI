@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Initiative } from '../../types/initiative';
 import { fromDbInitiative, DbInitiativeType } from '../../types/database';
-import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import { Database } from '../../types/supabase';
 import InitiativeForm from './InitiativeForm';
 import { calculateWeightedImpact, calculatePriorityScore, sortInitiativesByPriority } from '../../utils/prioritizationUtils';
 import { formatMonthYear } from '../../utils/dateUtils';
@@ -23,7 +24,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { SortableItem } from './SortableItem';
-import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { RealtimePostgresChangesPayload as SupabaseRealtimePayload } from '@supabase/supabase-js';
+import ErrorDisplay from '../shared/ErrorDisplay';
 
 /**
  * Props for the InitiativeList component
@@ -110,6 +112,7 @@ function DeleteModal({ isOpen, onConfirm, onCancel }: DeleteModalProps) {
 
 export default function InitiativeList() {
   const { user } = useAuth();
+  const supabaseClient = useSupabaseClient<Database>();
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingInitiative, setEditingInitiative] = useState<Initiative | undefined>();
@@ -125,20 +128,24 @@ export default function InitiativeList() {
 
   // Load initiatives from Supabase
   const loadInitiatives = async () => {
-    if (!user) return;
+    if (!user || !supabaseClient) {
+        setError('User or database connection unavailable.');
+        setIsLoading(false);
+        return; 
+    }
     
     try {
       setIsLoading(true);
       setError(null);
       
       console.log('Loading initiatives for user:', user.id);
-      const { data, error } = await supabase
+      const { data, error: dbError } = await supabaseClient
         .from('initiatives')
         .select('*')
         .eq('user_id', user.id)
         .order('priority_score', { ascending: false });
 
-      if (error) throw error;
+      if (dbError) throw dbError;
       
       if (data) {
         console.log('Loaded initiatives:', data.length);
@@ -157,20 +164,21 @@ export default function InitiativeList() {
   // Initial load
   useEffect(() => {
     loadInitiatives();
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, supabaseClient]);
 
   // Set up real-time subscription
   useEffect(() => {
-    if (!user) return;
+    if (!user || !supabaseClient) return;
 
     console.log('Setting up subscription for user:', user.id, 'channel:', channelName);
     let isSubscribed = true;
 
-    const subscription = supabase
+    const subscription = supabaseClient
       .channel(channelName)
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'initiatives', filter: `user_id=eq.${user.id}` },
-        async (payload: RealtimePostgresChangesPayload<DbInitiativeType>) => {
+        async (payload: SupabaseRealtimePayload<DbInitiativeType>) => {
           console.log('Received change event:', {
             type: payload.eventType,
             timestamp: new Date().toISOString(),
@@ -217,16 +225,27 @@ export default function InitiativeList() {
           }
         }
       )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         console.log('Subscription status:', status);
+        if (err) {
+          console.error('Realtime subscription error:', err);
+          setError(`Realtime connection error: ${err.message}`);
+        }
+         if (status === 'SUBSCRIBED') {
+           // Optional: Clear errors on successful subscribe?
+           // setError(null); 
+         }
       });
 
     return () => {
       console.log('Cleaning up subscription:', channelName);
       isSubscribed = false;
-      subscription.unsubscribe();
+      if (supabaseClient) {
+        supabaseClient.removeChannel(subscription);
+      }
     };
-  }, [user?.id, channelName]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, channelName, supabaseClient]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -273,16 +292,20 @@ export default function InitiativeList() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!user) return;
+    if (!user || !supabaseClient) {
+       setError('Cannot delete initiative: User or database connection unavailable.');
+       return; 
+    }
+    setError(null);
 
     try {
-      const { error } = await supabase
+      const { error: deleteError } = await supabaseClient
         .from('initiatives')
         .delete()
         .eq('id', id)
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
     } catch (error) {
       console.error('Error deleting initiative:', error);
       setError(error instanceof Error ? error.message : 'Failed to delete initiative');
@@ -309,12 +332,7 @@ export default function InitiativeList() {
 
   return (
     <div>
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-          <p className="font-medium">Error</p>
-          <p className="text-sm">{error}</p>
-        </div>
-      )}
+      {error && <ErrorDisplay message={error} onClose={() => setError(null)} />}
 
       <div className="mb-8">
         <div className="flex justify-between items-center">

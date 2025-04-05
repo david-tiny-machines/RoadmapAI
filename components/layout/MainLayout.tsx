@@ -52,6 +52,10 @@ const MainLayout = ({ children }: MainLayoutProps) => {
                 <Link href="/roadmap" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-primary-500">
                   Roadmap
                 </Link>
+                {/* Add Metrics Link */}
+                <Link href="/metrics" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-primary-500">
+                  Metrics
+                </Link>
               </div>
             </div>
             {/* User Menu */}

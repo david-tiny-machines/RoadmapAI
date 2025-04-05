@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useAuth } from '../../contexts/AuthContext';
+import ErrorDisplay from '../../components/shared/ErrorDisplay';
 
 export default function SignUp() {
   const [email, setEmail] = useState('');
@@ -76,7 +77,10 @@ export default function SignUp() {
           </div>
 
           {error && (
-            <div className="text-red-500 text-sm text-center">{error}</div>
+            <ErrorDisplay 
+              message={error} 
+              onClose={() => setError(null)} 
+            />
           )}
 
           <div>

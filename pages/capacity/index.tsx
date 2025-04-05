@@ -1,44 +1,52 @@
 import { useState, useEffect } from 'react';
 import CapacityManager from '../../components/capacity/CapacityManager';
-import { CapacityData } from '../../types/capacity';
 import { Initiative } from '../../types/initiative';
-
-const STORAGE_KEY = 'roadmapai_initiatives';
+import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { Database } from '../../types/supabase';
+import { fromDbInitiative } from '../../types/database';
 
 export default function Capacity() {
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
-  const [isClient, setIsClient] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const supabaseClient = useSupabaseClient<Database>();
+  const user = useUser();
 
-  // Set isClient to true when component mounts
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    const fetchInitiatives = async () => {
+      if (!user || !supabaseClient) return;
 
-  // Load initiatives from local storage
-  useEffect(() => {
-    if (!isClient) return;
+      setLoading(true);
+      setError(null);
 
-    console.log('Capacity page: Loading initiatives from local storage');
-    const stored = localStorage.getItem(STORAGE_KEY);
-    console.log('Capacity page: Stored data:', stored);
-    if (stored) {
+      console.log('Capacity page: Fetching initiatives from Supabase...');
       try {
-        const parsed = JSON.parse(stored);
-        console.log('Capacity page: Parsed initiatives:', parsed);
-        setInitiatives(parsed);
-      } catch (error) {
-        console.error('Capacity page: Error parsing initiatives:', error);
+        const { data, error: dbError } = await supabaseClient
+          .from('initiatives')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('priority_score', { ascending: false });
+
+        if (dbError) {
+          throw dbError;
+        }
+
+        const fetchedInitiatives = data.map(fromDbInitiative);
+        console.log('Capacity page: Fetched initiatives:', fetchedInitiatives);
+        setInitiatives(fetchedInitiatives);
+      } catch (e: any) {
+        console.error('Capacity page: Error fetching initiatives:', e);
+        setError('Failed to load initiatives. Please try refreshing.');
+      } finally {
+        setLoading(false);
       }
-    }
-  }, [isClient]);
+    };
 
-  const handleCapacityChange = (capacity: CapacityData) => {
-    // This will be used later for capacity visualization
-    console.log('Capacity updated:', capacity);
-  };
+    fetchInitiatives();
+  }, [user, supabaseClient]);
 
-  if (!isClient) {
-    return <div>Loading...</div>;
+  if (loading) {
+    return <div>Loading capacity data...</div>;
   }
 
   return (
@@ -50,7 +58,14 @@ export default function Capacity() {
         </p>
       </div>
 
-      <CapacityManager onCapacityChange={handleCapacityChange} initiatives={initiatives} />
+      {error && (
+        <div className="mb-4 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700" role="alert">
+          <strong className="font-bold">Error:</strong>
+          <span className="block sm:inline"> {error}</span>
+        </div>
+      )}
+
+      <CapacityManager initiatives={initiatives} />
     </div>
   );
 } 

@@ -1,7 +1,7 @@
-import { DbMetricType, MetricTypeDisplay } from './database';
+import { DbMetricType, METRIC_TYPE_DISPLAY } from './database';
 
 export interface HistoricalMetric {
-  id: number;
+  id: string;
   month: Date;
   value: number;
   type: DbMetricType;
@@ -11,7 +11,7 @@ export interface HistoricalMetric {
 
 export interface HistoricalMetricDisplay {
   id: string;
-  type: MetricTypeDisplay;
+  type: string;
   value: number;
   month: Date;
   createdAt: string;

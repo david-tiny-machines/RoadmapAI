@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { User, AuthError } from '@supabase/supabase-js';
-import { supabase } from '../utils/supabase';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { User, AuthError, SupabaseClient } from '@supabase/supabase-js';
+import { useSessionContext } from '@supabase/auth-helpers-react';
+import { Database } from '../types/supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -12,14 +13,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const { session, isLoading, supabaseClient, error: sessionError } = useSessionContext();
 
-  // Create or update user profile
-  const ensureUserProfile = async (user: User) => {
+  useEffect(() => {
+    if (sessionError) {
+      console.error("Session Context Error:", sessionError.message);
+    }
+  }, [sessionError]);
+
+  const ensureUserProfile = async (user: User, client: SupabaseClient) => {
+    if (!client) return;
     try {
-      const { data: existingProfile, error: fetchError } = await supabase
+      const { data: existingProfile, error: fetchError } = await client
         .from('user_profiles')
         .select('id, email, role')
         .eq('id', user.id)
@@ -31,11 +37,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!existingProfile) {
-        const { error: insertError } = await supabase
+        console.log('Creating user profile for:', user.email);
+        const { error: insertError } = await client
           .from('user_profiles')
           .upsert({
             id: user.id,
-            email: user.email,
+            email: user.email ?? 'FallbackEmailOnError',
             role: 'user'
           }, {
             onConflict: 'id'
@@ -44,6 +51,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (insertError) {
           console.error('Error creating user profile:', insertError);
         }
+      } else {
+        // Optional: Update profile if needed (e.g., email change)
+        // console.log('User profile exists for:', user.email);
       }
     } catch (error) {
       console.error('Error managing user profile:', error);
@@ -51,75 +61,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        ensureUserProfile(currentUser);
-      }
-      setLoading(false);
-    });
+    const currentUser = session?.user;
+    if (currentUser && supabaseClient) {
+      ensureUserProfile(currentUser, supabaseClient);
+    }
+  }, [session?.user, supabaseClient]);
 
-    // Listen for changes on auth state
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      
-      if (event === 'SIGNED_IN' && currentUser) {
-        await ensureUserProfile(currentUser);
-      }
-      
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const value = {
-    user,
-    loading,
+  const value: AuthContextType = {
+    user: session?.user ?? null,
+    loading: isLoading,
     signIn: async (email: string, password: string) => {
-      const { error } = await supabase.auth.signInWithPassword({
+      if (!supabaseClient) return { error: new AuthError('Supabase client not available') };
+      const { error } = await supabaseClient.auth.signInWithPassword({
         email,
         password,
       });
       return { error };
     },
     signUp: async (email: string, password: string) => {
-      const { data, error } = await supabase.auth.signUp({
+      if (!supabaseClient) return { error: new AuthError('Supabase client not available'), user: null };
+      const { data, error } = await supabaseClient.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            email_confirmed: true
-          }
-        }
       });
-      
-      if (!error && data.user) {
-        await ensureUserProfile(data.user);
-      }
-      
       return { error, user: data?.user ?? null };
     },
     signOut: async () => {
+      if (!supabaseClient) return { error: new AuthError('Supabase client not available') };
       try {
-        const { error } = await supabase.auth.signOut();
-        if (!error) {
-          setUser(null); // Explicitly clear user state
-        }
+        const { error } = await supabaseClient.auth.signOut();
         return { error };
       } catch (err) {
         console.error('Error during sign out:', err);
-        return { error: err as AuthError };
+        const authError = err instanceof AuthError ? err : new AuthError(String(err));
+        return { error: authError };
       }
     },
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {!isLoading && children}
     </AuthContext.Provider>
   );
 }

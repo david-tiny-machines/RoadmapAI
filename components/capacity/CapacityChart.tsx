@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { Initiative } from '../../types/initiative';
 import { MonthlyCapacity } from '../../types/capacity';
-import { calculateMonthlyEffort } from '../../utils/capacityUtils';
+import { calculateMonthlyEffort, MonthlyEffort } from '../../utils/capacityUtils';
 import { formatMonthYear } from '../../utils/dateUtils';
 
 interface CapacityChartProps {
@@ -20,7 +20,7 @@ interface CapacityChartProps {
   monthlyCapacities: MonthlyCapacity[];
 }
 
-const CapacityWarning = ({ data }: { data: any[] }) => {
+const CapacityWarning = ({ data }: { data: MonthlyEffort[] }) => {
   const overCapacityMonths = data.filter(month => 
     month.totalEffort > month.availableDays
   );
