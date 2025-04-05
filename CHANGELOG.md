@@ -31,6 +31,32 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - v0.1.3a: First iteration of Phase 3, PRD complete
 - v1.0.0: First major release
 
+## [v0.0.3g] - YYYY-MM-DD
+### Added
+- Migrated initiative data storage from local storage to Supabase `initiatives` table.
+- Added `user_id` foreign key relationship to initiatives.
+- Implemented Row Level Security (RLS) policies for initiatives (Users can manage their own).
+- Added database constraints (`confidence_range`, `effort_positive`, `valid_dates`).
+- Created `value_lever` ENUM type in database and updated table schema.
+
+### Changed
+- Updated `InitiativeList` to fetch, display, and sort initiatives from Supabase.
+- Implemented real-time updates in `InitiativeList` using Supabase subscriptions.
+- Updated `InitiativeForm` to save and update initiatives directly in Supabase.
+- Corrected `DbValueLever` type and `VALUE_LEVER_DISPLAY` mapping in `types/database.ts` to match actual requirements (removed cost_reduction, compliance_risk).
+
+### Fixed
+- Resolved date handling issues in `InitiativeForm`:
+  - Standardized date storage as `YYYY-MM-DD` (first day of month) using UTC methods to prevent timezone shifts.
+  - Corrected bug where editing initiatives without changing dates cleared existing dates.
+- Ensured `effort_estimate` is saved as an integer.
+- Allowed negative values to be entered and saved for the `uplift` field.
+- Resolved `NaN` warnings for number inputs in `InitiativeForm`.
+- Addressed database schema mismatch by creating `value_lever` ENUM type and altering column type via direct SQL.
+
+### Removed
+- Removed local storage usage for storing initiative data.
+
 ## [v0.0.3f]
 ### Added
 - Forecasting capabilities for historical metrics:

@@ -1,9 +1,13 @@
 'use client';
 
+import { useState, useEffect, useMemo } from 'react';
 import { Initiative } from '../../types/initiative';
-import { calculateWeightedImpact, calculatePriorityScore } from '../../utils/prioritizationUtils';
+import { fromDbInitiative, DbInitiativeType } from '../../types/database';
+import { supabase } from '../../utils/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import InitiativeForm from './InitiativeForm';
+import { calculateWeightedImpact, calculatePriorityScore, sortInitiativesByPriority } from '../../utils/prioritizationUtils';
 import { formatMonthYear } from '../../utils/dateUtils';
-import { useState, useEffect } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -11,16 +15,15 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent
 } from '@dnd-kit/core';
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy
+  verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { SortableItem } from './SortableItem';
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 /**
  * Props for the InitiativeList component
@@ -105,115 +108,125 @@ function DeleteModal({ isOpen, onConfirm, onCancel }: DeleteModalProps) {
   );
 }
 
-function SortableItem({ item, onEdit, onDelete }: { 
-  item: Initiative; 
-  onEdit: (initiative: Initiative) => void;
-  onDelete: (id: string) => void;
-}) {
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = useSortable({ id: item.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 1 : 0,
-  };
-
-  const handleDelete = () => {
-    setShowDeleteModal(true);
-  };
-
-  const confirmDelete = () => {
-    onDelete(item.id);
-    setShowDeleteModal(false);
-  };
-
-  const weightedImpact = calculateWeightedImpact(item);
-  const priorityScore = calculatePriorityScore(item);
-
-  return (
-    <>
-      <div
-        ref={setNodeRef}
-        style={style}
-        className={`p-4 rounded-lg border mb-2 ${
-          item.isMandatory ? 'bg-yellow-50' : 'bg-white'
-        } ${isDragging ? 'shadow-lg' : ''}`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <div
-              {...attributes}
-              {...listeners}
-              className="mr-3 cursor-move p-1 hover:bg-gray-100 rounded"
-            >
-              ⋮⋮
-            </div>
-            <div>
-              <div className="font-medium flex items-center">
-                {item.name}
-                {item.isMandatory && (
-                  <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
-                    Mandatory
-                  </span>
-                )}
-              </div>
-              <div className="text-sm text-gray-500">
-                {item.valueLever}
-                {(item.startMonth || item.endMonth) && (
-                  <span className="ml-2 text-gray-400">
-                    {item.startMonth && !item.endMonth && `From ${formatMonthYear(item.startMonth)}`}
-                    {!item.startMonth && item.endMonth && `Until ${formatMonthYear(item.endMonth)}`}
-                    {item.startMonth && item.endMonth && `${formatMonthYear(item.startMonth)} to ${formatMonthYear(item.endMonth)}`}
-                  </span>
-                )}
-              </div>
-              <div className="text-xs text-gray-400 mt-1">
-                Priority Score: {priorityScore.toFixed(2)} • 
-                Effort: {item.effortEstimate} days • 
-                Impact: {weightedImpact.toFixed(2)}%
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => onEdit(item)}
-              className="text-indigo-600 hover:text-indigo-900"
-            >
-              Edit
-            </button>
-            <button
-              onClick={handleDelete}
-              className="text-red-600 hover:text-red-900"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
-      <DeleteModal
-        isOpen={showDeleteModal}
-        onConfirm={confirmDelete}
-        onCancel={() => setShowDeleteModal(false)}
-      />
-    </>
-  );
-}
-
-export default function InitiativeList({ initiatives, onEdit, onDelete }: InitiativeListProps) {
-  const [items, setItems] = useState<Initiative[]>([]);
+export default function InitiativeList() {
+  const { user } = useAuth();
+  const [initiatives, setInitiatives] = useState<Initiative[]>([]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingInitiative, setEditingInitiative] = useState<Initiative | undefined>();
   const [showResetModal, setShowResetModal] = useState(false);
-  
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Memoize the channel name to prevent unnecessary re-subscriptions
+  const channelName = useMemo(() => 
+    `initiatives-${user?.id}`, 
+    [user?.id]
+  );
+
+  // Load initiatives from Supabase
+  const loadInitiatives = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Loading initiatives for user:', user.id);
+      const { data, error } = await supabase
+        .from('initiatives')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('priority_score', { ascending: false });
+
+      if (error) throw error;
+      
+      if (data) {
+        console.log('Loaded initiatives:', data.length);
+        const converted = data.map(fromDbInitiative);
+        // Sort by mandatory status first, then priority score
+        setInitiatives(sortInitiativesByPriority(converted));
+      }
+    } catch (error) {
+      console.error('Error loading initiatives:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load initiatives');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Initial load
   useEffect(() => {
-    setItems(initiatives);
-  }, [initiatives]);
+    loadInitiatives();
+  }, [user]);
+
+  // Set up real-time subscription
+  useEffect(() => {
+    if (!user) return;
+
+    console.log('Setting up subscription for user:', user.id, 'channel:', channelName);
+    let isSubscribed = true;
+
+    const subscription = supabase
+      .channel(channelName)
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'initiatives', filter: `user_id=eq.${user.id}` },
+        async (payload: RealtimePostgresChangesPayload<DbInitiativeType>) => {
+          console.log('Received change event:', {
+            type: payload.eventType,
+            timestamp: new Date().toISOString(),
+            payload
+          });
+
+          // Only update if we're still mounted
+          if (!isSubscribed) {
+            console.log('Component unmounted, ignoring update');
+            return;
+          }
+
+          try {
+            if (payload.eventType === 'INSERT') {
+              const newItem = fromDbInitiative(payload.new);
+              console.log('Adding new initiative:', newItem);
+              setInitiatives(current => {
+                const updated = [...current, newItem];
+                const sorted = sortInitiativesByPriority(updated);
+                console.log('Updated initiatives after INSERT:', sorted.length);
+                return sorted;
+              });
+            } else if (payload.eventType === 'UPDATE') {
+              console.log('Updating initiative:', payload.new.id);
+              setInitiatives(current => {
+                const updated = current.map(item => 
+                  item.id === payload.new.id ? fromDbInitiative(payload.new) : item
+                );
+                const sorted = sortInitiativesByPriority(updated);
+                console.log('Updated initiatives after UPDATE:', sorted.length);
+                return sorted;
+              });
+            } else if (payload.eventType === 'DELETE') {
+              console.log('Deleting initiative:', payload.old.id);
+              setInitiatives(current => {
+                const updated = current.filter(item => item.id !== payload.old.id);
+                const sorted = sortInitiativesByPriority(updated);
+                console.log('Updated initiatives after DELETE:', sorted.length);
+                return sorted;
+              });
+            }
+          } catch (error) {
+            console.error('Error handling subscription event:', error);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
+
+    return () => {
+      console.log('Cleaning up subscription:', channelName);
+      isSubscribed = false;
+      subscription.unsubscribe();
+    };
+  }, [user?.id, channelName]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -222,70 +235,127 @@ export default function InitiativeList({ initiatives, onEdit, onDelete }: Initia
     })
   );
 
-  function handleDragEnd(event: DragEndEvent) {
+  const handleDragEnd = (event: any) => {
     const { active, over } = event;
     
     if (over && active.id !== over.id) {
-      setItems((items) => {
+      setInitiatives((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
         
-        const draggedItem = items[oldIndex];
-        const targetItem = items[newIndex];
-        
-        // Prevent dragging optional items above mandatory ones
-        // AND prevent dragging mandatory items below optional ones
-        const isMandatoryToOptionalMove = draggedItem.isMandatory && 
-          items.slice(0, newIndex + 1).some(item => !item.isMandatory);
-        
-        if ((!draggedItem.isMandatory && targetItem.isMandatory) || isMandatoryToOptionalMove) {
+        // Get all mandatory items
+        const mandatoryItems = items.filter(item => item.isMandatory);
+        if (mandatoryItems.length === 0) {
+          return arrayMove(items, oldIndex, newIndex);
+        }
+
+        // Find the index of the last mandatory item
+        const lastMandatoryIndex = items.findIndex(item => 
+          item.id === mandatoryItems[mandatoryItems.length - 1].id
+        );
+
+        const activeItem = items[oldIndex];
+        const overItem = items[newIndex];
+
+        // Don't allow:
+        // 1. Moving mandatory items below optional ones
+        // 2. Moving optional items above mandatory ones
+        if (
+          (activeItem.isMandatory && newIndex > lastMandatoryIndex) || 
+          (!activeItem.isMandatory && newIndex <= lastMandatoryIndex)
+        ) {
           return items;
         }
         
         return arrayMove(items, oldIndex, newIndex);
       });
     }
-  }
+  };
 
-  const handleReset = () => {
-    // Sort by mandatory first, then by priority score
-    const sortedItems = [...initiatives].sort((a, b) => {
-      if (a.isMandatory !== b.isMandatory) {
-        return a.isMandatory ? -1 : 1;
-      }
-      const scoreA = calculatePriorityScore(a);
-      const scoreB = calculatePriorityScore(b);
-      return scoreB - scoreA;
-    });
-    setItems(sortedItems);
+  const handleDelete = async (id: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('initiatives')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error deleting initiative:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete initiative');
+    }
+  };
+
+  const handleEdit = (initiative: Initiative) => {
+    setEditingInitiative(initiative);
+    setIsFormOpen(true);
+  };
+
+  const handleFormClose = () => {
+    setEditingInitiative(undefined);
+    setIsFormOpen(false);
+    // Reload initiatives after form close to ensure we have the latest data
+    loadInitiatives();
+  };
+
+  const handleResetOrder = () => {
+    // Sort by priority score and mandatory status
+    setInitiatives(current => sortInitiativesByPriority(current));
     setShowResetModal(false);
   };
 
   return (
+    <div>
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+          <p className="font-medium">Error</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
+
+      <div className="mb-8">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold text-gray-900">Initiatives</h2>
+          <button
+            onClick={() => setIsFormOpen(true)}
+            className="btn-primary"
+          >
+            New Initiative
+          </button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      ) : initiatives.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          No initiatives yet. Click "New Initiative" to create one.
+        </div>
+      ) : (
+        <>
     <div className="mt-8">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h3 className="text-lg font-medium text-gray-900">
             Prioritised Initiatives 
-            <span className="text-sm text-gray-500 ml-2">({items.length} items)</span>
+                  <span className="text-sm text-gray-500 ml-2">({initiatives.length} items)</span>
           </h3>
           <p className="text-sm text-gray-500 mt-1">
-            Priority is calculated based on potential impact and confidence, balanced against effort required. Higher impact and confidence increase priority, while higher effort decreases it. Mandatory items always appear first.
+                  Drag and drop to reorder. Mandatory items must stay at the top.
           </p>
         </div>
         <button
           onClick={() => setShowResetModal(true)}
-          className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                className="text-sm text-primary-600 hover:text-primary-900"
         >
-          Reset Priority
+                Reset Order
         </button>
       </div>
-
-      <ConfirmModal
-        isOpen={showResetModal}
-        onConfirm={handleReset}
-        onCancel={() => setShowResetModal(false)}
-      />
 
       <DndContext
         sensors={sensors}
@@ -293,21 +363,56 @@ export default function InitiativeList({ initiatives, onEdit, onDelete }: Initia
         onDragEnd={handleDragEnd}
       >
         <SortableContext
-          items={items.map(item => item.id)}
+                items={initiatives.map(item => item.id)}
           strategy={verticalListSortingStrategy}
         >
           <div className="bg-white rounded-xl shadow-soft">
-            {items.map((item) => (
+                  {initiatives.map((item) => (
               <SortableItem
                 key={item.id}
                 item={item}
-                onEdit={onEdit}
-                onDelete={onDelete}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
               />
             ))}
           </div>
         </SortableContext>
       </DndContext>
+          </div>
+
+          <ConfirmModal
+            isOpen={showResetModal}
+            onConfirm={handleResetOrder}
+            onCancel={() => setShowResetModal(false)}
+          />
+        </>
+      )}
+
+      {isFormOpen && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                {editingInitiative ? 'Edit Initiative' : 'New Initiative'}
+              </h3>
+              <button
+                onClick={handleFormClose}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <span className="sr-only">Close</span>
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <InitiativeForm
+              onSave={handleFormClose}
+              onCancel={handleFormClose}
+              initialData={editingInitiative}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

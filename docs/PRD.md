@@ -100,15 +100,30 @@ Helps stakeholders understand when value is delivered and how team capacity is a
 - Continue using local storage
 
 ### 📈 Phase 3: Forecasting Engine & Data Infrastructure
-- Display forecast uplift vs. historic baseline
-- Track business metrics: conversion, loan size, interest rate
+- Basic forecasting capabilities:
+  - Historical metric tracking (conversion, loan size, interest rate)
+  - Trend-based forecasting with confidence intervals
+  - Metric visualization and charts
 - **Integrate Supabase for:**
   - Database setup for storing historical metrics
   - Basic authentication
   - Data persistence layer
   - User management
+  - Migration of local data:
+    - Initiative data with proper user associations
+    - Capacity data and team allocations
+    - Historical preferences and settings
+  - Enhanced data model with:
+    - Foreign key relationships
+    - Database constraints
+    - Data validation rules
+  - Real-time sync capabilities
 
 ### 🔁 Phase 4: Scenario & Goal Planning
+- Initiative impact modeling:
+  - Connect initiatives to metric forecasts
+  - Calculate cumulative uplift from initiatives
+  - Show baseline vs initiative-adjusted forecasts
 - Clone, tweak, and compare roadmap options
 - Leverage Supabase for:
   - Scenario storage and versioning

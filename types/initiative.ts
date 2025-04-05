@@ -1,23 +1,16 @@
-export type ValueLever = 
-  | 'Conversion'
-  | 'Average Loan Size'
-  | 'Interest Rate'
-  | 'Customer Acquisition'
-  | 'Customer Retention'
-  | 'Cost Reduction'
-  | 'Compliance/Risk Mitigation'
-  | 'BAU obligations';
+import { DbValueLever } from './database';
 
 export interface Initiative {
   id: string;
+  userId: string;
   name: string;
-  valueLever: ValueLever;
+  valueLever: DbValueLever;
   uplift: number;
   confidence: number;
   effortEstimate: number;
+  startMonth: string | null;
+  endMonth: string | null;
   isMandatory: boolean;
-  startMonth?: string;
-  endMonth?: string;
   createdAt: string;
   updatedAt: string;
 } 

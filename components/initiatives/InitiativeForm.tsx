@@ -1,176 +1,375 @@
-import { useState, FormEvent } from 'react';
-import { Initiative, ValueLever } from '../../types/initiative';
-
-const VALUE_LEVERS: ValueLever[] = [
-  'Conversion',
-  'Average Loan Size',
-  'Interest Rate',
-  'Customer Acquisition',
-  'Customer Retention',
-  'Cost Reduction',
-  'Compliance/Risk Mitigation',
-  'BAU obligations',
-];
+import { useState } from 'react';
+import { Initiative, DbValueLever, VALUE_LEVER_DISPLAY } from '../../types/database';
+import { supabase } from '../../utils/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { fromMonthString, formatDateToYYYYMMDD } from '../../utils/dateUtils';
+import { calculatePriorityScore } from '../../utils/prioritizationUtils';
 
 interface InitiativeFormProps {
-  onSubmit: (initiative: Omit<Initiative, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onSave: () => void;
+  onCancel: () => void;
   initialData?: Initiative;
 }
 
-export default function InitiativeForm({ onSubmit, initialData }: InitiativeFormProps) {
-  const [formData, setFormData] = useState({
+export default function InitiativeForm({ onSave, onCancel, initialData }: InitiativeFormProps) {
+  const { user } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState<Initiative>(() => ({
+    id: initialData?.id || crypto.randomUUID(),
+    userId: user?.id || '',
     name: initialData?.name || '',
-    valueLever: initialData?.valueLever || VALUE_LEVERS[0],
+    valueLever: initialData?.valueLever || 'conversion',
     uplift: initialData?.uplift || 0,
-    confidence: initialData?.confidence || 50,
-    effortEstimate: initialData?.effortEstimate || 1,
-    startMonth: initialData?.startMonth || '',
-    endMonth: initialData?.endMonth || '',
+    confidence: initialData?.confidence || 0,
+    effortEstimate: initialData?.effortEstimate || 0,
+    startMonth: initialData?.startMonth || null,
+    endMonth: initialData?.endMonth || null,
     isMandatory: initialData?.isMandatory || false,
-  });
+    createdAt: initialData?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }));
 
-  const handleSubmit = (e: FormEvent) => {
+  const validateDates = (startMonth: string | null, endMonth: string | null): string | null => {
+    if (!startMonth) return null;
+    if (!endMonth) return null;
+    return startMonth > endMonth ? 'End date cannot be before start date' : null;
+  };
+
+  const validateForm = (data: Initiative): string | null => {
+    if (!data.name.trim()) {
+      return 'Initiative name is required';
+    }
+
+    // --- Parse string numbers before validation ---
+    const upliftNum = parseFloat(data.uplift as any); // Use 'any' temporarily if TS complains about string
+    const confidenceNum = parseFloat(data.confidence as any);
+    const effortNum = parseFloat(data.effortEstimate as any);
+    // --- End parsing ---
+
+    // Note: No uplift validation needed as per previous step
+
+    if (isNaN(confidenceNum) || confidenceNum < 0 || confidenceNum > 100) {
+      return 'Confidence must be a number between 0 and 100';
+    }
+    if (isNaN(effortNum) || effortNum <= 0) {
+      return 'Effort estimate must be a number greater than 0';
+    }
+    
+    // Validate dates (ensure they are valid strings first)
+    const startMonthStr = typeof data.startMonth === 'string' ? data.startMonth : null;
+    const endMonthStr = typeof data.endMonth === 'string' ? data.endMonth : null;
+    if (startMonthStr && endMonthStr) {
+        // Additional check: ensure they are valid YYYY-MM or YYYY-MM-DD formats if needed
+        if (!isValidMonthFormat(startMonthStr) || !isValidMonthFormat(endMonthStr)) {
+            // return 'Invalid date format. Use YYYY-MM.'; // Or handle implicitly
+        } else {
+             return validateDates(startMonthStr, endMonthStr);
+        }
+    }
+
+    return null;
+  };
+
+  // Helper function (could be moved to dateUtils)
+  const isValidMonthFormat = (dateStr: string): boolean => {
+    return /^\d{4}-\d{2}$/.test(dateStr) || /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    if (!user) return;
+
+    // Validate all form fields
+    const validationError = validateForm(formData);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      // Intelligently format dates based on whether they were modified
+      let startMonthFormatted: string | null = null;
+      if (formData.startMonth) {
+          // Assuming startMonth is YYYY-MM or YYYY-MM-DD string based on state handling
+          const startMonthStr = formData.startMonth as string;
+          if (startMonthStr.length === 7) { // YYYY-MM
+             const dateObj = fromMonthString(startMonthStr);
+             startMonthFormatted = formatDateToYYYYMMDD(dateObj);
+          } else if (startMonthStr.length === 10 && isValidMonthFormat(startMonthStr)) { // YYYY-MM-DD
+             startMonthFormatted = startMonthStr;
+          }
+      }
+      
+      let endMonthFormatted: string | null = null;
+      if (formData.endMonth) {
+          const endMonthStr = formData.endMonth as string;
+          if (endMonthStr.length === 7) { // YYYY-MM
+             const dateObj = fromMonthString(endMonthStr);
+             endMonthFormatted = formatDateToYYYYMMDD(dateObj);
+          } else if (endMonthStr.length === 10 && isValidMonthFormat(endMonthStr)) { // YYYY-MM-DD
+             endMonthFormatted = endMonthStr;
+          }
+      }
+
+      // Parse and round numbers before saving
+      const upliftNum = parseFloat(formData.uplift as any) || 0;
+      const confidenceNum = parseFloat(formData.confidence as any) || 0;
+      const effortEstimateNum = parseFloat(formData.effortEstimate as any) || 0;
+      const effortEstimateInt = Math.round(effortEstimateNum);
+
+      // Calculate priority score using parsed numbers
+      const priorityScore = calculatePriorityScore({
+          ...formData, // Pass other fields
+          uplift: upliftNum,
+          confidence: confidenceNum,
+          effortEstimate: effortEstimateNum,
+      });
+
+      const { error } = await supabase
+        .from('initiatives')
+        .upsert({
+          id: formData.id,
+          user_id: user.id,
+          name: formData.name,
+          value_lever: formData.valueLever,
+          uplift: upliftNum, // Send parsed number
+          confidence: confidenceNum, // Send parsed number
+          effort_estimate: effortEstimateInt, // Send rounded integer
+          start_month: startMonthFormatted,
+          end_month: endMonthFormatted,
+          is_mandatory: formData.isMandatory,
+          created_at: initialData ? undefined : formData.createdAt,
+          updated_at: new Date().toISOString(),
+          priority_score: priorityScore,
+        });
+
+      if (error) throw error;
+      onSave();
+    } catch (error) {
+      console.error('Error saving initiative:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred while saving the initiative');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    
+    // Store raw value directly, handle type-specific needs later or on submit
+    let stateValue: string | boolean | null;
+
+    if (type === 'checkbox') {
+       stateValue = (e.target as HTMLInputElement).checked;
+    } else {
+        // Store raw string value for text, number, month, select.
+        // This avoids NaN for numbers and allows typing "-".
+        // Actual numeric conversion/validation happens in validateForm/handleSubmit.
+        stateValue = value;
+        // Handle null for empty month inputs explicitly if needed
+        if ((name === 'startMonth' || name === 'endMonth') && value === '') {
+            stateValue = null;
+        }
+    }
+
+    const newFormData = {
+      ...formData,
+      [name]: stateValue,
+    };
+
+    // Minimal immediate validation (e.g., required fields)
+    // Defer numeric/complex validation to validateForm before submit
+    let validationError: string | null = null;
+    if (name === 'name') {
+      if (typeof stateValue === 'string' && !stateValue.trim()) {
+        validationError = 'Initiative name is required';
+      }
+    }
+    // Potentially add date range validation here if desired immediately
+    // else if (name === 'startMonth' || name === 'endMonth') {
+    //   if (newFormData.startMonth && newFormData.endMonth) {
+    //       validationError = validateDates(newFormData.startMonth as string, newFormData.endMonth as string);
+    //   }
+    // }
+
+    setError(validationError); // Show only immediate errors
+    setFormData(newFormData); 
+  };
+
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: checked,
+    }));
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl mx-auto bg-white p-6 rounded-xl shadow-soft">
-      {/* Name */}
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <div className="flex">
+            <div className="py-1">
+              <svg className="fill-current h-6 w-6 text-red-500 mr-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"/>
+              </svg>
+            </div>
+            <div>
+              <p className="font-bold">Error Saving Initiative</p>
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
-        <label htmlFor="name" className="form-label">
-          Initiative Name
+        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+          Name
         </label>
         <input
           type="text"
           id="name"
-          className="input-field"
+          name="name"
           value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          onChange={handleChange}
           required
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
         />
       </div>
 
-      {/* Value Lever */}
       <div>
-        <label htmlFor="valueLever" className="form-label">
+        <label htmlFor="valueLever" className="block text-sm font-medium text-gray-700">
           Value Lever
         </label>
         <select
           id="valueLever"
-          className="input-field"
+          name="valueLever"
           value={formData.valueLever}
-          onChange={(e) => setFormData({ ...formData, valueLever: e.target.value as ValueLever })}
+          onChange={handleChange}
           required
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
         >
-          {VALUE_LEVERS.map((lever) => (
-            <option key={lever} value={lever}>
-              {lever}
+          {Object.entries(VALUE_LEVER_DISPLAY).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
             </option>
           ))}
         </select>
       </div>
 
-      {/* Estimated Uplift */}
       <div>
-        <label htmlFor="uplift" className="form-label">
-          Estimated Uplift (%)
+        <label htmlFor="uplift" className="block text-sm font-medium text-gray-700">
+          Uplift (%)
         </label>
         <input
           type="number"
           id="uplift"
-          className="input-field"
+          name="uplift"
           value={formData.uplift}
-          onChange={(e) => setFormData({ ...formData, uplift: parseFloat(e.target.value) })}
-          step="0.1"
+          onChange={handleChange}
           required
+          max="100"
+          step="0.1"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
         />
       </div>
 
-      {/* Confidence */}
       <div>
-        <label htmlFor="confidence" className="form-label">
+        <label htmlFor="confidence" className="block text-sm font-medium text-gray-700">
           Confidence (%)
         </label>
-        <div className="flex items-center space-x-4">
-          <input
-            type="range"
-            id="confidence"
-            className="w-full"
-            value={formData.confidence}
-            onChange={(e) => setFormData({ ...formData, confidence: parseInt(e.target.value) })}
-            min="0"
-            max="100"
-            step="1"
-          />
-          <span className="text-sm font-medium w-12">{formData.confidence}%</span>
-        </div>
+        <input
+          type="number"
+          id="confidence"
+          name="confidence"
+          value={formData.confidence}
+          onChange={handleChange}
+          required
+          min="0"
+          max="100"
+          step="1"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+        />
       </div>
 
-      {/* Effort Estimate */}
       <div>
-        <label htmlFor="effortEstimate" className="form-label">
+        <label htmlFor="effortEstimate" className="block text-sm font-medium text-gray-700">
           Effort Estimate (days)
         </label>
         <input
           type="number"
           id="effortEstimate"
-          className="input-field"
+          name="effortEstimate"
           value={formData.effortEstimate}
-          onChange={(e) => setFormData({ ...formData, effortEstimate: parseInt(e.target.value) })}
-          min="1"
+          onChange={handleChange}
           required
+          min="0"
+          step="0.5"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
         />
       </div>
 
-      {/* Date Range */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="startMonth" className="form-label flex items-center space-x-1">
-            <span>Start Month</span>
-            <span className="text-sm text-gray-500">(Optional)</span>
-          </label>
-          <input
-            type="month"
-            id="startMonth"
-            className="input-field"
-            value={formData.startMonth}
-            onChange={(e) => setFormData({ ...formData, startMonth: e.target.value })}
-          />
-        </div>
-        <div>
-          <label htmlFor="endMonth" className="form-label flex items-center space-x-1">
-            <span>End Month</span>
-            <span className="text-sm text-gray-500">(Optional)</span>
-          </label>
-          <input
-            type="month"
-            id="endMonth"
-            className="input-field"
-            value={formData.endMonth}
-            onChange={(e) => setFormData({ ...formData, endMonth: e.target.value })}
-          />
-        </div>
+      <div>
+        <label htmlFor="startMonth" className="block text-sm font-medium text-gray-700">
+          Start Month
+        </label>
+        <input
+          type="month"
+          id="startMonth"
+          name="startMonth"
+          value={formData.startMonth ? formData.startMonth.substring(0, 7) : ''}
+          onChange={handleChange}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+        />
       </div>
 
-      {/* Mandatory Toggle */}
-      <div className="flex items-center space-x-2">
+      <div>
+        <label htmlFor="endMonth" className="block text-sm font-medium text-gray-700">
+          End Month
+        </label>
+        <input
+          type="month"
+          id="endMonth"
+          name="endMonth"
+          value={formData.endMonth ? formData.endMonth.substring(0, 7) : ''}
+          onChange={handleChange}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <div className="flex items-center">
         <input
           type="checkbox"
           id="isMandatory"
-          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+          name="isMandatory"
           checked={formData.isMandatory}
-          onChange={(e) => setFormData({ ...formData, isMandatory: e.target.checked })}
+          onChange={handleCheckboxChange}
+          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
         />
-        <label htmlFor="isMandatory" className="text-sm font-medium text-gray-700">
+        <label htmlFor="isMandatory" className="ml-2 block text-sm text-gray-900">
           Mandatory Initiative
         </label>
       </div>
 
-      {/* Submit Button */}
-      <div className="flex justify-end">
-        <button type="submit" className="btn-primary">
-          Save Initiative
+      <div className="flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isSubmitting}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+        >
+          {isSubmitting ? 'Saving...' : 'Save'}
         </button>
       </div>
     </form>

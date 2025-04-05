@@ -75,11 +75,25 @@ export function formatMonthYear(dateStr: string): string {
  * fromMonthString('2025-03')
  */
 export function fromMonthString(monthStr: string): Date {
-  if (!monthStr) return new Date();
+  if (!monthStr || typeof monthStr !== 'string' || !monthStr.includes('-')) {
+     // Return an invalid date or handle error appropriately if input is bad
+     return new Date(NaN); 
+  }
   
-  const [year, month] = monthStr.split('-');
-  const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-  date.setHours(0, 0, 0, 0); // Ensure consistent time
+  const parts = monthStr.split('-');
+  if (parts.length !== 2) return new Date(NaN); // Invalid format
+
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+
+  // Validate parts
+  if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+    return new Date(NaN); // Invalid date parts
+  }
+
+  // Create Date object using UTC values
+  // Note: month in Date constructor is 0-indexed (0=Jan, 1=Feb, ...)
+  const date = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)); 
   return date;
 }
 
@@ -99,6 +113,23 @@ export function formatMonthYearFromDate(date: Date): string {
     month: 'short',
     year: 'numeric'
   });
+}
+
+/**
+ * Formats a Date object or null into a YYYY-MM-DD string or null.
+ * Uses UTC methods to avoid timezone-related date shifts.
+ * @param {Date | null} date - Date object or null to format
+ * @returns {string | null} Formatted date string (YYYY-MM-DD) or null
+ */
+export function formatDateToYYYYMMDD(date: Date | null): string | null {
+  if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+    return null;
+  }
+  // Use UTC methods to prevent timezone shifts when extracting date parts
+  const year = date.getUTCFullYear();
+  const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+  const day = date.getUTCDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**
