@@ -1,3 +1,6 @@
+import { fromMonthString, formatDateToYYYYMMDD } from '../utils/dateUtils';
+import { MonthlyCapacity } from './capacity';
+
 // ENUM types
 export type DbMetricType = 'conversion' | 'average_loan_size' | 'interest_rate';
 export type DbUserRole = 'admin' | 'user';
@@ -44,6 +47,16 @@ export interface DbInitiativeType {
   is_mandatory: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface DbCapacityType {
+  id: string; // UUID from DB
+  user_id: string;
+  month: string; // Stored as DATE (YYYY-MM-01) in DB
+  available_days: number;
+  created_at: string;
+  updated_at: string;
+  // team_id: string | null; // Deferred
 }
 
 // Frontend types
@@ -94,5 +107,53 @@ export function fromDbInitiative(dbInitiative: DbInitiativeType): Initiative {
     isMandatory: dbInitiative.is_mandatory,
     createdAt: dbInitiative.created_at,
     updatedAt: dbInitiative.updated_at,
+  };
+}
+
+// Capacity Conversion Utilities
+
+/**
+ * Converts frontend MonthlyCapacity (UI format) to a format suitable for
+ * upserting into the Supabase monthly_capacity table.
+ * Expects month in 'YYYY-MM' format.
+ * Converts month to 'YYYY-MM-01' format for DB DATE type.
+ * Requires user_id.
+ */
+export function toDbCapacity(
+  capacity: MonthlyCapacity,
+  userId: string
+): Omit<DbCapacityType, 'id' | 'created_at' | 'updated_at'> {
+  const monthDate = fromMonthString(capacity.month); // Get Date object for start of month
+  if (isNaN(monthDate.getTime())) {
+    throw new Error(`Invalid month format provided to toDbCapacity: ${capacity.month}`);
+  }
+
+  const monthDbFormat = formatDateToYYYYMMDD(monthDate); // Format as YYYY-MM-01 string
+
+  // This check is technically redundant if fromMonthString and formatDateToYYYYMMDD work correctly,
+  // but provides an extra layer of safety.
+  if (monthDbFormat === null) {
+    throw new Error(`Failed to format valid date for month: ${capacity.month}`);
+  }
+
+  return {
+    user_id: userId,
+    month: monthDbFormat, // Now guaranteed to be a string
+    available_days: Math.max(0, Math.round(capacity.availableDays)), // Ensure non-negative integer
+  };
+}
+
+/**
+ * Converts DbCapacityType (database format) to frontend MonthlyCapacity (UI format).
+ * Expects month in 'YYYY-MM-DD' format (specifically YYYY-MM-01).
+ * Converts month back to 'YYYY-MM' format for UI state.
+ */
+export function fromDbCapacity(dbCapacity: DbCapacityType): MonthlyCapacity {
+  // Convert 'YYYY-MM-DD' (DB format) back to 'YYYY-MM' (UI format) using slice
+  const monthUiFormat = dbCapacity.month.slice(0, 7); 
+
+  return {
+    month: monthUiFormat,
+    availableDays: dbCapacity.available_days,
   };
 } 

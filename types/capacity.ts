@@ -4,7 +4,5 @@ export interface MonthlyCapacity {
 }
 
 export interface CapacityData {
-  id: string;
   monthlyCapacities: MonthlyCapacity[];
-  updatedAt: string;
 } 

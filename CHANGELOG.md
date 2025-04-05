@@ -31,7 +31,34 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - v0.1.3a: First iteration of Phase 3, PRD complete
 - v1.0.0: First major release
 
-## [v0.0.3g] - YYYY-MM-DD
+## [v0.0.3h] - YYYY-MM-DD
+### Added
+- Created Supabase table `monthly_capacity` to store user-specific available working days per month.
+- Implemented Row Level Security (RLS) policies for `monthly_capacity` (Users manage their own).
+- Added database constraints (`positive_capacity`, `unique_user_month_capacity`) and index for `monthly_capacity`.
+- Added `DbCapacityType` interface and `toDbCapacity`/`fromDbCapacity` conversion utilities.
+- Implemented loading spinner and error display (`ErrorDisplay` component) in `CapacityManager`.
+- Integrated Supabase type generation (`types/supabase.ts`) via CLI.
+- Correctly configured `SessionContextProvider` in `_app.tsx` to provide the Supabase client.
+
+### Changed
+- Refactored `CapacityManager` component to fetch/save data from Supabase `monthly_capacity` table.
+- Updated `CapacityManager` state logic for asynchronous Supabase operations (fetch, upsert).
+- Standardized date handling in `CapacityManager` to use `YYYY-MM-01` format for database interaction, preventing timezone issues.
+- Added browser-level input validation (`min="0"`) for capacity values.
+
+### Fixed
+- Resolved "supabase.from is not a function" error by implementing `SessionContextProvider` in `_app.tsx`.
+- Addressed various Supabase CLI execution issues within the Replit environment (installation methods, `npx` usage, login/auth flow).
+
+### Removed
+- Removed local storage (`roadmapai_capacity`) usage for storing capacity data.
+- Removed redundant top-level `id` and `updatedAt` fields from the frontend `CapacityData` type.
+
+### Known Issues
+- Capacity page: The `CapacityChart` does not display initiative effort (Mandatory/Optional Effort bars) because the parent page component is not fetching initiative data from Supabase after the v0.0.3g migration. Initiative data needs to be fetched and passed down as a prop to `CapacityManager`.
+
+## [v0.0.3g] - 2025-04-06
 ### Added
 - Migrated initiative data storage from local storage to Supabase `initiatives` table.
 - Added `user_id` foreign key relationship to initiatives.
