@@ -31,6 +31,17 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - v0.1.3a: First iteration of Phase 3, PRD complete
 - v1.0.0: First major release
 
+## [v0.0.3j] - 2025-04-07
+### Added
+- Added Supabase tables (`scenarios`, `scenario_initiatives`), RLS policies, and triggers via SQL Editor to support Phase 4 Scenario Planning.
+- Updated `db/schema.sql` to include definitions for `scenarios` and `scenario_initiatives` tables.
+
+### Changed
+- Regenerated Supabase TypeScript types (`types/supabase.ts`) via CLI to include new Phase 4 tables (`scenarios`, `scenario_initiatives`).
+
+### Other
+- Conducted Phase 3 stability review: Verified data consistency for Initiatives (UUIDs, `user_id`, persisted `priority_score`, `YYYY-MM-DD` dates) and Capacity (`YYYY-MM-DD` dates) against `v0.0.3a` known issues; confirmed prior fixes are effective.
+
 ## [v0.0.3i] - 2025-04-06
 ### Added
 - Added database constraint `confidence_range` (0-100) to `initiatives` table.

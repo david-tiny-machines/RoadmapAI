@@ -193,6 +193,63 @@ CREATE POLICY "Users can delete their own capacity" ON monthly_capacity
 CREATE TRIGGER update_monthly_capacity_updated_at BEFORE UPDATE ON monthly_capacity FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
+-- Table to store overall scenario details
+CREATE TABLE IF NOT EXISTS scenarios (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Index for user's scenarios
+CREATE INDEX scenarios_user_id_idx ON scenarios (user_id);
+
+-- Enable RLS for scenarios
+ALTER TABLE scenarios ENABLE ROW LEVEL SECURITY;
+
+-- Policies for scenarios: Users manage their own
+CREATE POLICY "Users can view their own scenarios" ON scenarios
+  FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own scenarios" ON scenarios
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own scenarios" ON scenarios
+  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own scenarios" ON scenarios
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Trigger for scenarios updated_at
+CREATE TRIGGER update_scenarios_updated_at
+  BEFORE UPDATE ON scenarios
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Junction table linking initiatives to scenarios
+-- Stores which initiatives are included in a specific scenario
+CREATE TABLE IF NOT EXISTS scenario_initiatives (
+  scenario_id UUID NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,
+  initiative_id UUID NOT NULL REFERENCES initiatives(id) ON DELETE CASCADE,
+  -- Add scenario-specific overrides here if needed in future (e.g., different start/end?)
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+  PRIMARY KEY (scenario_id, initiative_id) -- Composite primary key
+);
+
+-- Index for faster lookups
+CREATE INDEX scenario_initiatives_scenario_id_idx ON scenario_initiatives (scenario_id);
+CREATE INDEX scenario_initiatives_initiative_id_idx ON scenario_initiatives (initiative_id);
+
+-- Enable RLS for scenario_initiatives
+ALTER TABLE scenario_initiatives ENABLE ROW LEVEL SECURITY;
+
+-- Policies for scenario_initiatives: Users can manage links for their own scenarios
+-- Assumes users implicitly own initiatives linked to their scenarios. Refine if initiative ownership differs.
+CREATE POLICY "Users can view initiative links for their own scenarios" ON scenario_initiatives
+  FOR SELECT USING (EXISTS (SELECT 1 FROM scenarios WHERE scenarios.id = scenario_id AND scenarios.user_id = auth.uid()));
+CREATE POLICY "Users can insert initiative links for their own scenarios" ON scenario_initiatives
+  FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM scenarios WHERE scenarios.id = scenario_id AND scenarios.user_id = auth.uid()));
+CREATE POLICY "Users can delete initiative links for their own scenarios" ON scenario_initiatives
+  FOR DELETE USING (EXISTS (SELECT 1 FROM scenarios WHERE scenarios.id = scenario_id AND scenarios.user_id = auth.uid()));
+
 
 
 

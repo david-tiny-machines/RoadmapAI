@@ -111,6 +111,66 @@ export type Database = {
         }
         Relationships: []
       }
+      scenario_initiatives: {
+        Row: {
+          created_at: string
+          initiative_id: string
+          scenario_id: string
+        }
+        Insert: {
+          created_at?: string
+          initiative_id: string
+          scenario_id: string
+        }
+        Update: {
+          created_at?: string
+          initiative_id?: string
+          scenario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scenario_initiatives_initiative_id_fkey"
+            columns: ["initiative_id"]
+            isOneToOne: false
+            referencedRelation: "initiatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scenario_initiatives_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "scenarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scenarios: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           created_at: string
