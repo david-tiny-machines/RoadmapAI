@@ -1,51 +1,115 @@
 # Completing Phase 3: Forecasting Engine & Data Infrastructure
 
+## Current Focus (Testing Phase)
+We are currently testing the basic metrics functionality that has been implemented:
+- Verifying MetricInput component works correctly
+- Testing metrics page data loading and display
+- Checking date handling between frontend and Supabase
+- Validating error handling and form validation
+
+Recent fixes:
+- **Historical metrics date handling improvements**:
+  - Fixed month selection to only show previous months (not current/future)
+  - Updated metrics components to use proper Date objects internally 
+  - Added new utility functions in dateUtils.ts for date conversions
+  - Ensured correct formatting between UI (month/year only) and database (DATE format)
+  - Maintained user-friendly display without exposing day-level granularity
+
+Once testing is complete, we will proceed with implementing the MetricChart component.
+
 ## Current Status (v0.0.3a)
 ✅ Completed:
 - Basic authentication with Supabase
 - User profile management
 - Database schema setup
 - Data persistence layer for users and initiatives
+- Basic metrics infrastructure:
+  - Database schema for historical_metrics
+  - MetricInput component for data entry
+  - Basic metrics page with table view
+  - RLS policies for admin-only modifications
 
 ❌ Missing:
 1. Historical Metrics Features
-   - Upload/input interface for historical metrics
-   - Storage and retrieval of metric history
-   - API endpoints for metric management
+   - ✅ Upload/input interface for historical metrics
+   - ✅ Storage and retrieval of metric history
+   - ❌ Metric visualization (charts)
+   - ❌ API endpoints for metric management
 
 2. Forecasting Engine
-   - Baseline metric visualization
-   - Forecast calculation logic
-   - Uplift visualization against baseline
+   - ❌ Baseline metric visualization
+   - ❌ Forecast calculation logic
+   - ❌ Uplift visualization against baseline
 
 3. Business Metrics Tracking
-   - Conversion rate tracking
-   - Loan size tracking
-   - Interest rate tracking
-   - Metric history views
+   - ✅ Basic conversion rate tracking
+   - ✅ Basic loan size tracking
+   - ✅ Basic interest rate tracking
+   - ❌ Metric history views with charts
+   - ❌ Trend analysis
 
 ## Implementation Plan
 
 ### 1. Database Work
+✅ Completed:
 - Add indexes for metric queries
-- Implement metric aggregation functions
 - Set up metric type validation
 
+❌ Still Needed:
+- Implement metric aggregation functions
+
 ### 2. Backend API
+✅ Completed:
+- Basic Supabase integration for metrics
+
+❌ Still Needed:
 - Create metric upload endpoints
 - Implement forecast calculation endpoints
 - Add metric retrieval and filtering
 
 ### 3. Frontend Components
+✅ Completed:
 - Historical metric input form
+- Basic metric management interface
+
+❌ Still Needed:
 - Metric visualization charts
 - Forecast display components
-- Metric management interface
+- Enhanced metric management interface
 
 ### 4. Integration
+❌ Still Needed:
 - Connect forecast display to initiatives
 - Link metric history to forecasts
 - Implement real-time metric updates
+
+## Revised Implementation Order
+
+1. **Metric Visualization (Current Focus)**
+   - Create MetricChart component using Recharts
+   - Implement proper date handling per fix-date.md
+   - Add type selection and date range controls
+   - Add interactive tooltips and legends
+
+   **Metrics improvements needed:**
+   - Improve date formatting with a dedicated library (date-fns)
+   - Add client-side validation for type/month unique constraint
+   - Add form validation to handle potential duplicate entries
+
+2. **Forecasting Foundation**
+   - Create ForecastDisplay component
+   - Implement basic forecast calculations
+   - Add initiative impact visualization
+
+3. **API and Data Layer**
+   - Add metric aggregation functions
+   - Create forecast calculation endpoints
+   - Implement metric filtering and retrieval
+
+4. **Integration and Polish**
+   - Connect forecasts to initiatives
+   - Add real-time updates
+   - Enhance UI/UX
 
 ## One-Shot Prompt
 

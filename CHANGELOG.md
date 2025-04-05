@@ -31,6 +31,55 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - v0.1.3a: First iteration of Phase 3, PRD complete
 - v1.0.0: First major release
 
+## [v0.0.3d]
+### Added
+- Complete historical metrics functionality:
+  - Metric input interface with validation
+  - Proper date handling and timezone fixes
+  - Database storage with Supabase integration
+  - Type-safe metric management
+  - Tabbed interface for metric organization
+
+### Changed
+- Enhanced metric data handling:
+  - Standardized date storage as first day of month
+  - Improved timezone handling to prevent date shifting
+  - Implemented proper financial data validation
+  - Added user-friendly error messages
+  - Optimized table display with metric-specific views
+
+### Fixed
+- Date handling issues in metric storage:
+  - Resolved timezone conversion problems
+  - Standardized date format between UI and database
+  - Fixed month selection logic
+- Duplicate entry handling:
+  - Added proper error messages for unique constraint violations
+  - Maintained form state on submission errors
+- Value validation:
+  - Enforced appropriate decimal precision for each metric type
+  - Added helpful validation messages for invalid inputs
+
+### Technical
+- New components:
+  - `MetricTabs.tsx` for metric type filtering
+  - `MetricTable.tsx` for type-specific displays
+- Updated `metrics/index.tsx` with new component architecture
+- Enhanced database integration:
+  - Proper handling of DATE types
+  - Consistent timezone handling
+  - Unique constraint enforcement
+- Verified through comprehensive test plan:
+  - Test 3.1-3.2: Fixed month selection and storage
+  - Test 4.1: Proper duplicate handling
+  - Test 5.1: Enhanced sorting and organization
+  - Test 5.2: Improved financial data validation
+
+### Known Issues
+- Multiple GoTrueClient instances warning in console
+- Inconsistent error handling patterns across components
+- Some components still need timezone handling fixes (inherited from v0.0.3c)
+
 ## [v0.0.3c]
 ### Fixed
 - Backported fix from Phase 2: Initiative drag and drop prioritization now correctly maintains mandatory-before-optional ordering
@@ -59,22 +108,80 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
   - Historical metrics
 - Auth context for state management
 - Test page for authentication verification
+- Technical debt tracking in docs/technical-debt.md
+  - Added testing infrastructure proposal
+  - Documented type system improvements
 
 ### Changed
 - Migrated from local storage to Supabase database
 - Updated MainLayout to handle auth state
 - Enhanced error handling in auth flows
+- Aligned metric type ENUMs with database conventions
+  - Updated from Title Case to snake_case
+  - Added type-safe conversion between display and storage formats
+  - Fixed mismatch between frontend and database types
 
 ### Technical
 - Added Supabase client configuration
 - Implemented RLS policies for data security
 - Added TypeScript types for auth context
+- Added database type definitions and conversion utilities
+- Updated components to handle database/display type conversion
 
 ### Known Issues
 - Initiative date range calculation in `utils/capacityUtils.ts` may fail if `monthlyCapacities` has fewer than three entries
 - Type safety issue in `CapacityChart.tsx` where `CapacityWarning` component uses `any[]` type instead of proper `MonthlyEffort` interface
 - Initiative list state in `InitiativeList.tsx` may become out of sync with parent's initiatives prop due to missing dependency array
 - Bulk update feature in `CapacityManager.tsx` lacks validation for negative numbers and invalid inputs
+- Date format mismatch between application and database:
+  - App uses string format ('YYYY-MM') while Supabase uses DATE type
+  - Affects all date fields in initiatives and capacity management
+  - Risk of data inconsistency and comparison issues
+  - Requires standardization to use proper DATE types internally while maintaining month/year-only UI
+  - Note: Fixed for metrics, still needed for other components
+- Timezone handling issues in date-related components:
+  - `CapacityManager.tsx` uses toISOString() for dates which may cause timezone shifts
+  - `InitiativeForm.tsx` month selection may be affected by timezone conversion
+  - These components need the same date handling fix applied to MetricInput
+  - Impact: Dates might shift by one day depending on user's timezone
+  - Workaround: Use explicit YYYY-MM-DD string format instead of toISOString()
+- Schema/implementation mismatch for initiatives:
+  - Current schema.sql defines initiatives table with UUID keys, user_id foreign keys, and database-computed priority scores
+  - Current implementation uses local storage with string IDs, no user association, and client-computed scores
+  - This mismatch will require data migration and code updates in Phase 4:
+    - Generate UUIDs for existing initiatives
+    - Associate initiatives with user accounts
+    - Migrate priority score computation to database
+    - Update frontend to handle database IDs and user associations
+- Priority score calculation in `prioritizationUtils.ts` is not persisted, leading to potential inconsistencies when initiatives are reloaded
+- Value lever and metric type overlap:
+  - While display/database conversion is now handled, architectural decision needed on shared business logic
+  - Consider unifying calculation and validation logic for shared metrics/levers
+- Missing database constraints for initiative fields:
+  - `confidence` should be limited to 0-100
+  - `effort_estimate` should be positive
+- Inconsistent timestamp handling between database and application:
+  - Database uses TIMESTAMPTZ while application uses string types
+  - No standardized approach to timezone handling across components
+  - Risk of timestamp-related bugs in date comparisons and sorting
+- Generic error handling doesn't provide specific feedback for different error types
+- Admin-only metrics functionality exists in database but admin interface is planned for Phase 6
+- Database constraint forces metric values to be ≥ 0, which may not support negative interest rates in the future
+- Multiple Supabase GoTrueClient instances detected in browser console:
+  - Console warnings indicate authentication client is initialized multiple times
+  - May lead to inefficient resource usage and potential race conditions
+  - Should be refactored to use a single, application-wide authentication client
+- NaN warning in MetricInput component:
+  - Console warning "Received NaN for the 'value' attribute" when deleting the value in the input field
+  - Issue caused by parseFloat() on empty string returning NaN in onChange handler
+  - Form validation works but creates console warnings
+  - Should handle empty string case before parsing to number
+- Inconsistent error handling patterns across components:
+  - Initiatives use modal dialogs for errors and confirmations
+  - Metrics use inline error messages
+  - Auth pages use inline error messages
+  - Form components use inline validation errors
+  - Not a functional issue, but creates inconsistent UX
 
 ## [v0.0.2b]
 ### Fixed
