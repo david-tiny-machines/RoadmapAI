@@ -78,8 +78,6 @@ const StorageDebugPage: React.FC = () => {
             <p>Status: {capacityData ? 'Present' : 'Not set'}</p>
             {capacityData && (
               <div className="text-sm text-gray-600 mt-1">
-                ID: {capacityData.id}
-                <br />
                 Months: {capacityData.monthlyCapacities.length}
               </div>
             )}
