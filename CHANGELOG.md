@@ -33,6 +33,18 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 
 ## [Unreleased]
 
+## [v0.0.4e] - 2025-04-08
+### Added
+- **Initiative Impact Visualization (Forecast View):**
+  - Enhanced `utils/forecastUtils.ts` (`calculateForecast` function) to calculate an `adjustedForecastValues` array, incorporating the cumulative impact of completed initiatives based on their `roadmap_delivery_month`, `value_lever`, `uplift`, and `confidence`.
+  - Implemented different calculation logic: direct percentage point addition for `conversion` and `interest_rate`, and relative percentage increase for `average_loan_size`.
+  - Updated `pages/metrics/index.tsx` to fetch initiative and capacity data, calculate the schedule using `calculateRoadmapSchedule`, pass required data to `calculateForecast`, and retrieve `adjustedForecastValues`.
+  - Updated `components/metrics/ForecastDisplay.tsx` to accept `adjustedForecastValues` as a prop and render it as a new "Adjusted Forecast" line series on the chart, distinct from the baseline "Forecast".
+  - Included `adjustedForecastValues` in the Y-axis dynamic range calculation.
+
+### Changed
+- Adjusted test data `uplift` values in `db/seeds/01_test_data.sql` for `conversion` and `interest_rate` initiatives to provide a more realistic adjusted forecast visualization.
+
 ## [v0.0.4d] - 2025-04-08
 ### Changed
 - **Roadmap Gantt Chart (`components/roadmap/RoadmapGantt.tsx`)**:

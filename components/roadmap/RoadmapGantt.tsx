@@ -188,7 +188,7 @@ const RoadmapGantt: React.FC<RoadmapGanttProps> = ({ scheduledInitiatives }) => 
         <YAxis
           type="category"
           dataKey="name"
-          width={150} // Ensure enough space for initiative names
+          width={150}
           axisLine={false}
           tickLine={false}
         />

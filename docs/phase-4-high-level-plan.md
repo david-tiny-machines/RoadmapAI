@@ -58,10 +58,11 @@ Phase 4 will be delivered in five distinct versions (updated from four):
 *   **Technical Considerations:**
     *   Modify forecasting utility functions (`utils/forecastUtils.ts`) and/or components (`ForecastDisplay.tsx`).
     *   Input baseline forecast data and the scheduled initiative data (including `roadmap_delivery_month`).
-    *   Implement the defined impact calculation: `Adjusted = Baseline + (Uplift * Confidence)`.
+    *   Implement the defined impact calculation: `Adjusted = Baseline + (Uplift * Confidence)`. (Note: Specific logic varies by metric type as implemented - point addition for % metrics, relative % for currency).
     *   Ensure correct mapping of `value_lever` to the affected metric.
     *   Handle the scale/units of `uplift` and `confidence` correctly.
     *   Update chart rendering to include the adjusted forecast series.
+*   **Status:** COMPLETE
 
 ## Database Schema
 

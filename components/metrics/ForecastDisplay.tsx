@@ -40,6 +40,7 @@ interface ForecastDisplayProps {
   forecastMonths?: number;
   showConfidenceBands?: boolean;
   artificialConfidenceDecimal?: number;
+  adjustedForecastValues?: Array<{ month: Date; value: number }>;
 }
 
 // NEW: Local formatter specifically for this component's display
@@ -62,7 +63,8 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
   metricType,
   forecastMonths = 6,
   showConfidenceBands = true,
-  artificialConfidenceDecimal
+  artificialConfidenceDecimal,
+  adjustedForecastValues
 }) => {
   // Calculate date range based on current date and forecast period
   const dateRange = useMemo(() => {
@@ -74,41 +76,23 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
   }, [forecastMonths]);
 
   // Step 1: Calculate projected values (depends on metrics, forecastMonths)
-  const projectedValues = useMemo(() => {
-    console.log("Recalculating Projected Values...") // Debug log
-    try {
-      if (!metrics || metrics.length < 2) {
-        console.warn('ForecastDisplay: Not enough metrics for forecast value calculation.');
-        return [];
-      }
-      // Call calculateForecast just for projected values (pass dummy confidence?)
-      // Or better: Refactor calculateForecast slightly later if needed, for now just call it
-      const result = calculateForecast(metrics, forecastMonths);
-      return result.projectedValues;
-    } catch (error) {
-      console.error("Error calculating projected values:", error);
-      return [];
-    }
-  }, [metrics, forecastMonths]);
-
-  // Step 2: Calculate confidence interval (using current percentage)
-  const confidenceInterval = useMemo(() => {
-    console.log("Recalculating Confidence Interval...") // Debug log
-    // Need the forecast logic again or pass relevant parts (slope, intercept, stdErr etc)
-    // Simpler for now: recalculate fully but only use the interval part
-    // This avoids major refactor of calculateForecast for now
+  const forecastResult = useMemo(() => {
+    console.log("ForecastDisplay: Recalculating Forecast...") // Debug log
     try {
         if (!metrics || metrics.length < 2) {
-           return undefined;
+            console.warn('ForecastDisplay: Not enough metrics for forecast calculation.');
+            return { projectedValues: [], confidenceInterval: undefined };
         }
-        // Recalculate but only care about the interval, using the decimal prop
-        const result = calculateForecast(metrics, forecastMonths, artificialConfidenceDecimal);
-        return result.confidenceInterval;
+        // Call calculateForecast using only the props available to this component
+        return calculateForecast(metrics, forecastMonths, artificialConfidenceDecimal);
     } catch (error) {
-        console.error("Error calculating confidence interval:", error);
-        return undefined;
+        console.error("Error calculating forecast within ForecastDisplay:", error);
+        return { projectedValues: [], confidenceInterval: undefined };
     }
-  }, [metrics, forecastMonths, artificialConfidenceDecimal, projectedValues]); // projectedValues dependency might be redundant if metrics/months cover it
+  }, [metrics, forecastMonths, artificialConfidenceDecimal]);
+
+  const projectedValues = forecastResult.projectedValues;
+  const confidenceInterval = forecastResult.confidenceInterval;
 
   useEffect(() => {
     if (metricType === 'conversion') {
@@ -117,7 +101,7 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
         console.log("ForecastDisplay Debug - Projected Values:", projectedValues);
         console.log("ForecastDisplay Debug - Confidence Interval:", confidenceInterval);
     }
-  }, [metricType, metrics, projectedValues, confidenceInterval]);
+  }, [metricType, metrics, projectedValues, confidenceInterval, adjustedForecastValues]);
 
   // Filter historical data to show only last 3 months
   const visibleMetrics = useMemo(() => {
@@ -132,14 +116,16 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
   const allYValuesFixedRange = useMemo(() => {
     const historicalYs = visibleMetrics.map(m => m.value);
     const forecastYs = projectedValues.map(p => p.value);
+    const adjustedYs = adjustedForecastValues ? adjustedForecastValues.map(a => a.value) : []; // Add adjusted values
 
     // Simulate bounds at max percentage (0.5 for 50%)
     const MAX_CONFIDENCE_DECIMAL = 0.50;
+    // Use projected values for confidence band calculation base
     const lowerBoundMaxYs = projectedValues.map(p => Math.max(0, p.value - (p.value * MAX_CONFIDENCE_DECIMAL)));
     const upperBoundMaxYs = projectedValues.map(p => p.value + (p.value * MAX_CONFIDENCE_DECIMAL));
 
-    return [...historicalYs, ...forecastYs, ...lowerBoundMaxYs, ...upperBoundMaxYs];
-  }, [visibleMetrics, projectedValues]); // Depends only on forecast line
+    return [...historicalYs, ...forecastYs, ...lowerBoundMaxYs, ...upperBoundMaxYs, ...adjustedYs]; // Include adjustedYs
+  }, [visibleMetrics, projectedValues, adjustedForecastValues]); // Add adjustedForecastValues dependency
 
   const yMinFixed = useMemo(() => allYValuesFixedRange.length > 0 ? Math.min(...allYValuesFixedRange) : 0, [allYValuesFixedRange]);
   const yMaxFixed = useMemo(() => allYValuesFixedRange.length > 0 ? Math.max(...allYValuesFixedRange) : 100, [allYValuesFixedRange]);
@@ -158,7 +144,7 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
         tension: 0.1
       },
       {
-        label: 'Forecast',
+        label: 'Forecast', // This is the BASELINE forecast
         data: projectedValues.map(p => ({
           x: new Date(p.month),
           y: p.value
@@ -167,6 +153,20 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
         borderDash: [5, 5],
         tension: 0.1
       },
+      // --- START: Conditionally add Adjusted Forecast dataset ---
+      ...(adjustedForecastValues && adjustedForecastValues.length > 0 ? [
+          {
+              label: 'Adjusted Forecast',
+              data: adjustedForecastValues.map(a => ({
+                  x: new Date(a.month),
+                  y: a.value
+              })),
+              borderColor: 'rgb(255, 99, 132)', // Use a distinct color (e.g., red)
+              tension: 0.1,
+              borderWidth: 2 // Slightly thicker line?
+          }
+      ] : []),
+      // --- END: Conditionally add Adjusted Forecast dataset ---
       ...(showConfidenceBands && confidenceInterval ? [
         {
           label: 'Upper Bound',
@@ -176,7 +176,7 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
           })),
           borderColor: 'rgba(153, 102, 255, 0.2)',
           backgroundColor: 'rgba(153, 102, 255, 0.1)',
-          fill: '1',
+          fill: '1', // Fill to dataset index 1 (Forecast baseline)
           pointRadius: 0,
           tension: 0.1
         },
@@ -188,7 +188,7 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
           })),
           borderColor: 'rgba(153, 102, 255, 0.2)',
           backgroundColor: 'rgba(153, 102, 255, 0.1)',
-          fill: '1',
+          fill: '1', // Fill to dataset index 1 (Forecast baseline)
           pointRadius: 0,
           tension: 0.1
         }
@@ -237,7 +237,7 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
             if (context.raw && typeof context.raw === 'object' && 'y' in context.raw) {
               const originalValue = Number(context.raw.y);
               const label = context.dataset.label || '';
-              // Reverted: Use the original value for formatting
+              // Tooltip formatting remains the same, uses dataset label
               return `${label}: ${formatForecastDisplayValue(originalValue, metricType)}`;
             }
             return '';

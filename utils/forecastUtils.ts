@@ -1,9 +1,12 @@
 import { HistoricalMetric } from '../types/metrics';
-import { addMonths, startOfMonth, differenceInMonths as dateFnsDifferenceInMonths } from 'date-fns';
+import { DbMetricType, DbValueLever } from '../types/database';
+import { ScheduledInitiative } from './schedulingUtils';
+import { addMonths, startOfMonth, differenceInMonths as dateFnsDifferenceInMonths, parseISO } from 'date-fns';
 
 export interface ForecastResult {
   projectedValues: Array<{ month: Date; value: number }>;
   confidenceInterval?: Array<{ month: Date; upper: number; lower: number }>;
+  adjustedForecastValues?: Array<{ month: Date; value: number }>;
 }
 
 interface TrendResult {
@@ -64,14 +67,17 @@ export function calculateTrend(metrics: HistoricalMetric[]): TrendResult {
 
 /**
  * Calculate forecast values and confidence intervals
+ * Optionally includes adjusted forecast based on initiative impact.
  */
 export function calculateForecast(
   metrics: HistoricalMetric[], 
   months: number,
-  artificialConfidenceDecimal?: number
+  artificialConfidenceDecimal?: number,
+  scheduledInitiatives?: ScheduledInitiative[],
+  metricType?: DbMetricType
 ): ForecastResult {
   if (!metrics.length) {
-    throw new Error('No historical data available for forecast');
+    return { projectedValues: [], confidenceInterval: [], adjustedForecastValues: [] };
   }
 
   // Sort metrics by date
@@ -110,7 +116,62 @@ export function calculateForecast(
     };
   });
 
-  return { projectedValues, confidenceInterval }; // Return raw values
+  // --- START: Adjusted Forecast Calculation ---
+  let adjustedForecastValues: Array<{ month: Date; value: number }> | undefined = undefined;
+
+  if (scheduledInitiatives && scheduledInitiatives.length > 0 && metricType) {
+    adjustedForecastValues = [];
+    let cumulativeImpact = 0; // Track cumulative impact across months
+
+    // Sort initiatives by delivery month to process in order (important for accumulation)
+    // Handle null delivery months (unscheduled) - filter them out or place them last? Filter out for now.
+    const completedInitiatives = scheduledInitiatives
+      .filter(init => init.roadmap_delivery_month !== null)
+      .sort((a, b) => parseISO(a.roadmap_delivery_month!).getTime() - parseISO(b.roadmap_delivery_month!).getTime());
+
+    let lastProcessedInitiativeIndex = -1;
+
+    for (const baselinePoint of projectedValues) {
+      const forecastMonthStart = startOfMonth(baselinePoint.month);
+
+      // Accumulate impact from initiatives completed *before* this forecast month starts
+      for (let i = lastProcessedInitiativeIndex + 1; i < completedInitiatives.length; i++) {
+          const initiative = completedInitiatives[i];
+          const deliveryMonthStart = startOfMonth(parseISO(initiative.roadmap_delivery_month!));
+
+          // Check if delivery month is strictly before the current forecast month
+          if (deliveryMonthStart.getTime() < forecastMonthStart.getTime()) {
+              // Check if the initiative's value lever maps to the current metric type
+              if (mapsToMetric(initiative.value_lever, metricType)) {
+                  const confidenceDecimal = initiative.confidence / 100;
+                  let singleImpact = 0;
+
+                  if (metricType === 'conversion' || metricType === 'interest_rate') {
+                      // Uplift is percentage points, add directly (scaled by confidence)
+                      singleImpact = initiative.uplift * confidenceDecimal;
+                  } else if (metricType === 'average_loan_size') {
+                      // Uplift is relative percentage (scaled by confidence)
+                      // IMPORTANT: Impact is relative to the *baseline* for that month
+                      singleImpact = baselinePoint.value * (initiative.uplift / 100) * confidenceDecimal;
+                  }
+                  // Add other metric types here if needed in the future
+
+                  cumulativeImpact += singleImpact;
+              }
+              lastProcessedInitiativeIndex = i; // Update index to avoid reprocessing
+          } else {
+              // Initiatives are sorted, so no need to check further for this forecast month
+              break;
+          }
+      }
+
+      const adjustedValue = Math.max(0, baselinePoint.value + cumulativeImpact);
+      adjustedForecastValues.push({ month: baselinePoint.month, value: adjustedValue });
+    }
+  }
+  // --- END: Adjusted Forecast Calculation ---
+
+  return { projectedValues, confidenceInterval, adjustedForecastValues }; // Return raw values
 }
 
 /**
@@ -121,4 +182,21 @@ function differenceInMonths(laterDate: Date, earlierDate: Date): number {
     (laterDate.getFullYear() - earlierDate.getFullYear()) * 12 +
     (laterDate.getMonth() - earlierDate.getMonth())
   );
-} 
+}
+
+// --- START: Helper function to map ValueLever to MetricType ---
+const mapsToMetric = (lever: DbValueLever, metricType: DbMetricType): boolean => {
+  switch (metricType) {
+    case 'conversion':
+      return lever === 'conversion';
+    case 'average_loan_size':
+      // Note: DbMetricType uses 'average_loan_size', ValueLever uses 'average_loan_size'
+      // Ensure consistency or handle mapping if they diverge. Assuming they match now.
+      return lever === 'average_loan_size';
+    case 'interest_rate':
+      return lever === 'interest_rate';
+    default:
+      return false; // Ignore other levers for now
+  }
+};
+// --- END: Helper function --- 

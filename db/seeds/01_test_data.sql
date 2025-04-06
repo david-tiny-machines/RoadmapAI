@@ -78,30 +78,30 @@ VALUES
   ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Regulatory Compliance Update Q3', 'bau', 0, 100, 40, TRUE, 0, null, null),
   ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Security Patch Rollout', 'bau', 0, 100, 15, TRUE, 0, null, null),
 
-  -- High Priority / High Impact
-  ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Streamlined Loan Application Flow', 'conversion', 50, 80, 70, FALSE, 7.62, null, '2025-08-01'), -- Added end_month to test deadline miss
-  ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Improve ID Verification Speed', 'conversion', 30, 90, 30, FALSE, 6.13, null, null),
+  -- High Priority / High Impact (Uplift adjusted AGAIN)
+  ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Streamlined Loan Application Flow', 'conversion', 1.5, 80, 70, FALSE, 7.62, null, '2025-08-01'), -- Adjusted Uplift from 3 to 1.5
+  ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Improve ID Verification Speed', 'conversion', 1, 90, 30, FALSE, 6.13, null, null), -- Adjusted Uplift from 2 to 1
 
   -- Average Loan Size
   ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Promote Top-Up Loans Feature', 'average_loan_size', 5, 70, 50, FALSE, 71.28, null, null),
   ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Introduce Higher Loan Tiers', 'average_loan_size', 10, 50, 85, FALSE, 91.91, null, null),
 
-  -- Interest Rate
-  ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Risk-Based Pricing Adjustment', 'interest_rate', 15, 75, 60, FALSE, 220.04, null, null),
+  -- Interest Rate (Uplift adjusted)
+  ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Risk-Based Pricing Adjustment', 'interest_rate', 5, 75, 60, FALSE, 220.04, null, null), -- Adjusted Uplift from 15 to 5
 
   -- Customer Acq/Retention
   ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Referral Program Launch', 'customer_acquisition', 10, 60, 45, FALSE, 124.83, '2025-11-01', null), -- Added start_month
   ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Implement Loyalty Rewards', 'customer_retention', 5, 50, 55, FALSE, 49.94, null, null),
 
-  -- Lower Priority / Small Impact
+  -- Lower Priority / Small Impact (Uplift adjusted AGAIN)
   ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Update FAQ Section', 'bau', 0, 100, 5, FALSE, 0, null, null),
-  ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Minor UI Polish - Dashboard', 'conversion', 5, 95, 10, FALSE, 1.44, null, null),
+  ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Minor UI Polish - Dashboard', 'conversion', 0.2, 95, 10, FALSE, 1.44, null, null), -- Adjusted Uplift from 0.5 to 0.2
 
   -- Multi-Month
   ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Core Platform Infrastructure Upgrade', 'bau', 0, 90, 150, FALSE, 0, null, null),
 
-  -- Low Confidence / Potential Capacity Issue
-  ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Experimental Feature X (Low Conf)', 'conversion', 80, 20, 70, FALSE, 3.05, null, null),
+  -- Low Confidence / Potential Capacity Issue (Uplift adjusted AGAIN)
+  ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Experimental Feature X (Low Conf)', 'conversion', 1, 20, 70, FALSE, 3.05, null, null), -- Adjusted Uplift from 2 to 1
 
   -- Added for testing date constraints
   ('3578ff51-28af-4f04-b376-0c1a621d48cc', 'Late Start, Low Prio', 'bau', 0, 100, 50, FALSE, 0, '2027-01-01', null), -- Start after capacity horizon
