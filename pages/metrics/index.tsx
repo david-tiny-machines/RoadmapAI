@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { Database } from '../../types/supabase';
 import MetricInput from '../../components/metrics/MetricInput';
@@ -41,7 +41,7 @@ export default function MetricsPage() {
 
   const supabaseClient = useSupabaseClient<Database>();
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!supabaseClient) {
       setError("Database connection not available.");
       setIsLoading(false);
@@ -104,11 +104,11 @@ export default function MetricsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [supabaseClient]);
 
   useEffect(() => {
     fetchData();
-  }, [supabaseClient]);
+  }, [fetchData, supabaseClient]);
 
   // --- START: Calculate Schedule and Forecast ---
   const scheduledInitiativesResult = useMemo(() => {

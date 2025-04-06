@@ -111,7 +111,7 @@ export default function Capacity() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Capacity Plan</h1>
         <p className="mt-2 text-gray-600">
-          View scheduled initiative load against your team's available capacity.
+          {'View scheduled initiative load against your team\'s available capacity.'}
         </p>
       </div>
 
