@@ -35,7 +35,7 @@ const getColor = (initiative: ScheduledInitiative): string => {
   if (initiative.deadline_missed) {
     return '#DC2626'; // Red for missed deadline (priority)
   }
-  if (initiative.is_mandatory) {
+  if (initiative.isMandatory) {
     return '#F59E0B'; // Amber-500 for mandatory (on schedule)
   }
   // Default color for non-mandatory, on-schedule initiatives
@@ -79,27 +79,25 @@ const RoadmapGantt: React.FC<RoadmapGanttProps> = ({ scheduledInitiatives }) => 
     const startDate = parseISO(initiative.roadmap_start_month!);
     const deliveryDate = parseISO(initiative.roadmap_delivery_month!);
 
-    // Calculate the position (index) of the start and end months on the axis
     const startMonthIndex = differenceInCalendarMonths(startDate, chartStartDate);
     const endMonthIndex = differenceInCalendarMonths(addMonths(deliveryDate, 1), chartStartDate);
 
-    // Define the bar range [start_index, end_index]
     const barStart = startMonthIndex;
     const barEnd = endMonthIndex;
 
-    // Ensure value_lever retains its specific DbValueLever type
-    const valueLeverTyped: DbValueLever = initiative.value_lever;
+    // Assign valueLever directly
+    const valueLeverTyped: DbValueLever = initiative.valueLever; 
 
     return {
       name: initiative.name,
-      valueLever: valueLeverTyped,
-      effort: initiative.effort_estimate,
+      valueLever: valueLeverTyped, 
+      effort: initiative.effortEstimate, 
       deadlineMissed: initiative.deadline_missed,
       startMonthStr: format(startDate, 'MMM yyyy'),
       deliveryMonthStr: format(deliveryDate, 'MMM yyyy'),
       barRange: [barStart, barEnd],
       fillColor: getColor(initiative),
-      isMandatory: initiative.is_mandatory,
+      isMandatory: initiative.isMandatory, // Ensure this is the only isMandatory line and uses camelCase
     };
   });
 

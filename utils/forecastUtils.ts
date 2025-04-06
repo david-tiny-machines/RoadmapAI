@@ -2,6 +2,7 @@ import { HistoricalMetric } from '../types/metrics';
 import { DbMetricType, DbValueLever } from '../types/database';
 import { ScheduledInitiative } from './schedulingUtils';
 import { addMonths, startOfMonth, differenceInMonths as dateFnsDifferenceInMonths, parseISO } from 'date-fns';
+import { formatDateToYYYYMMDD } from './dateUtils';
 
 export interface ForecastResult {
   projectedValues: Array<{ month: Date; value: number }>;
@@ -119,51 +120,59 @@ export function calculateForecast(
   // --- START: Adjusted Forecast Calculation ---
   let adjustedForecastValues: Array<{ month: Date; value: number }> | undefined = undefined;
 
+  console.log('[ForecastUtil] Calculating adjusted forecast. Metric:', metricType, 'Num Initiatives:', scheduledInitiatives?.length);
+
   if (scheduledInitiatives && scheduledInitiatives.length > 0 && metricType) {
     adjustedForecastValues = [];
-    let cumulativeImpact = 0; // Track cumulative impact across months
+    let cumulativeImpact = 0; 
 
-    // Sort initiatives by delivery month to process in order (important for accumulation)
-    // Handle null delivery months (unscheduled) - filter them out or place them last? Filter out for now.
     const completedInitiatives = scheduledInitiatives
       .filter(init => init.roadmap_delivery_month !== null)
       .sort((a, b) => parseISO(a.roadmap_delivery_month!).getTime() - parseISO(b.roadmap_delivery_month!).getTime());
+
+    console.log('[ForecastUtil] Filtered/Sorted Initiatives:', completedInitiatives.map(i => ({id: i.id, name: i.name, delivery: i.roadmap_delivery_month, uplift: i.uplift, confidence: i.confidence, lever: i.valueLever })));
 
     let lastProcessedInitiativeIndex = -1;
 
     for (const baselinePoint of projectedValues) {
       const forecastMonthStart = startOfMonth(baselinePoint.month);
+      let impactThisMonthIteration = 0; // Log impact calculated in this iteration
 
       // Accumulate impact from initiatives completed *before* this forecast month starts
       for (let i = lastProcessedInitiativeIndex + 1; i < completedInitiatives.length; i++) {
           const initiative = completedInitiatives[i];
-          const deliveryMonthStart = startOfMonth(parseISO(initiative.roadmap_delivery_month!));
+          // Safely parse date, handle potential errors
+          let deliveryMonthStart: Date | null = null;
+          try {
+              deliveryMonthStart = startOfMonth(parseISO(initiative.roadmap_delivery_month!));
+          } catch (e) {
+              console.error(`[ForecastUtil] Error parsing delivery month for initiative ${initiative.id}:`, initiative.roadmap_delivery_month, e);
+              continue; // Skip initiative if date is invalid
+          }
 
-          // Check if delivery month is strictly before the current forecast month
           if (deliveryMonthStart.getTime() < forecastMonthStart.getTime()) {
-              // Check if the initiative's value lever maps to the current metric type
-              if (mapsToMetric(initiative.value_lever, metricType)) {
+              const maps = mapsToMetric(initiative.valueLever, metricType); // Use frontend valueLever
+              if (maps) {
                   const confidenceDecimal = initiative.confidence / 100;
                   let singleImpact = 0;
 
                   if (metricType === 'conversion' || metricType === 'interest_rate') {
-                      // Uplift is percentage points, add directly (scaled by confidence)
                       singleImpact = initiative.uplift * confidenceDecimal;
                   } else if (metricType === 'average_loan_size') {
-                      // Uplift is relative percentage (scaled by confidence)
-                      // IMPORTANT: Impact is relative to the *baseline* for that month
                       singleImpact = baselinePoint.value * (initiative.uplift / 100) * confidenceDecimal;
                   }
-                  // Add other metric types here if needed in the future
-
+                  
+                  console.log(`[ForecastUtil] Applying impact: Init ${initiative.id}, Month ${formatDateToYYYYMMDD(forecastMonthStart)}, Single Impact: ${singleImpact.toFixed(4)}`);
                   cumulativeImpact += singleImpact;
+                  impactThisMonthIteration += singleImpact; // Track for logging
               }
-              lastProcessedInitiativeIndex = i; // Update index to avoid reprocessing
+              lastProcessedInitiativeIndex = i; 
           } else {
-              // Initiatives are sorted, so no need to check further for this forecast month
               break;
           }
       }
+      
+      console.log(`[ForecastUtil] Forecast Month ${formatDateToYYYYMMDD(forecastMonthStart)} - Baseline: ${baselinePoint.value.toFixed(4)}, Impact Added This Iteration: ${impactThisMonthIteration.toFixed(4)}, Cumulative Impact: ${cumulativeImpact.toFixed(4)}`);
 
       const adjustedValue = Math.max(0, baselinePoint.value + cumulativeImpact);
       adjustedForecastValues.push({ month: baselinePoint.month, value: adjustedValue });
@@ -171,7 +180,7 @@ export function calculateForecast(
   }
   // --- END: Adjusted Forecast Calculation ---
 
-  return { projectedValues, confidenceInterval, adjustedForecastValues }; // Return raw values
+  return { projectedValues, confidenceInterval, adjustedForecastValues }; 
 }
 
 /**

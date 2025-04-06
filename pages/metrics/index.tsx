@@ -1,4 +1,9 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from 'react';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { Database } from '../../types/supabase';
 import MetricInput from '../../components/metrics/MetricInput';
@@ -10,36 +15,76 @@ import ChartControls from '../../components/metrics/ChartControls';
 import { ForecastDisplay } from '../../components/metrics/ForecastDisplay';
 import { ForecastControls } from '../../components/metrics/ForecastControls';
 import { HistoricalMetric } from '../../types/metrics';
-import { DbMetricType, DbInitiativeType, DbCapacityType } from '../../types/database';
-import { calculateRoadmapSchedule, ScheduledInitiative } from '../../utils/schedulingUtils';
+import { DbMetricType as DbMetricTypeValue, DbInitiativeType, DbCapacityType, Initiative, fromDbInitiative } from '../../types/database';
+import { calculateRoadmapSchedule, ScheduleResult } from '../../utils/schedulingUtils';
 import { calculateForecast, ForecastResult } from '../../utils/forecastUtils';
 import ErrorDisplay from '../../components/shared/ErrorDisplay';
+
+// Define the structure expected from the DB historical_metrics table
+interface DbMetric {
+  id: string;
+  month: string; // Expect string like YYYY-MM-DD
+  value: number;
+  type: 'conversion' | 'loan_size' | 'interest_rate'; // DB specific type values
+  created_at: string;
+  updated_at: string;
+}
+
+// Function to convert DB metric to frontend HistoricalMetric
+function fromDbMetric(dbMetric: DbMetric): HistoricalMetric | null {
+  if (!dbMetric || typeof dbMetric !== 'object') return null;
+  try {
+    let frontendType: DbMetricTypeValue;
+    switch (dbMetric.type) {
+      case 'loan_size':
+        frontendType = 'average_loan_size';
+        break;
+      case 'conversion':
+      case 'interest_rate':
+        frontendType = dbMetric.type;
+        break;
+      default:
+        console.warn(`Unexpected DB metric type: ${dbMetric.type}`);
+        return null;
+    }
+
+    return {
+      id: dbMetric.id,
+      month: new Date(dbMetric.month),
+      value: dbMetric.value,
+      type: frontendType,
+      createdAt: new Date(dbMetric.created_at),
+      updatedAt: new Date(dbMetric.updated_at),
+    };
+  } catch (e) {
+    console.error("Error converting DB metric:", e, dbMetric);
+    return null;
+  }
+}
 
 type ViewMode = 'table' | 'chart' | 'forecast';
 
 export default function MetricsPage() {
+  const supabaseClient = useSupabaseClient<Database>();
   const [metrics, setMetrics] = useState<HistoricalMetric[]>([]);
-  const [activeTab, setActiveTab] = useState<DbMetricType>('conversion');
-  const [viewMode, setViewMode] = useState<ViewMode>('forecast');
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [rawMetricsData, setRawMetricsData] = useState<DbMetric[]>([]);
+  const [initiatives, setInitiatives] = useState<Initiative[]>([]);
+  const [monthlyCapacity, setMonthlyCapacity] = useState<DbCapacityType[]>([]);
+  const [activeTab, setActiveTab] = useState<DbMetricTypeValue>('conversion');
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [dateRange, setDateRange] = useState(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setMonth(start.getMonth() - 5);
+    return { start, end };
+  });
   const [showDataPoints, setShowDataPoints] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
   const [forecastMonths, setForecastMonths] = useState(6);
   const [showConfidenceBands, setShowConfidenceBands] = useState(true);
-  const [confidencePercentage, setConfidencePercentage] = useState(5);
-  const [dateRange, setDateRange] = useState(() => {
-    const end = new Date();
-    const start = new Date();
-    start.setMonth(end.getMonth() - 6); // Default to 6 months
-    return { start, end };
-  });
-  const [rawMetricsData, setRawMetricsData] = useState<HistoricalMetric[]>([]);
-
-  const [initiatives, setInitiatives] = useState<DbInitiativeType[]>([]);
-  const [monthlyCapacity, setMonthlyCapacity] = useState<DbCapacityType[]>([]);
-
-  const supabaseClient = useSupabaseClient<Database>();
+  const [confidencePercentage, setConfidencePercentage] = useState(10);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!supabaseClient) {
@@ -47,51 +92,36 @@ export default function MetricsPage() {
       setIsLoading(false);
       return;
     }
-    setError(null);
     setIsLoading(true);
-
+    setError(null);
     try {
-      const [metricsResult, initiativesResult, capacityResult] = await Promise.all([
-        supabaseClient.from('historical_metrics').select('*').order('month', { ascending: true }),
-        supabaseClient.from('initiatives').select('*'),
-        supabaseClient.from('monthly_capacity').select('*')
-      ]);
-
+      // Fetch metrics
+      const metricsResult = await supabaseClient
+        .from('historical_metrics')
+        .select('*')
+        .order('month', { ascending: true });
       if (metricsResult.error) throw new Error(`Metrics fetch failed: ${metricsResult.error.message}`);
-      const formattedMetrics: HistoricalMetric[] = metricsResult.data?.map(metric => {
-        let frontendType: DbMetricType;
-        switch (metric.type) {
-          case 'loan_size':
-            frontendType = 'average_loan_size';
-            break;
-          case 'conversion':
-            frontendType = 'conversion';
-            break;
-          case 'interest_rate':
-            frontendType = 'interest_rate';
-            break;
-          default:
-            console.warn(`Unexpected metric type from DB: ${metric.type}`);
-            frontendType = 'conversion';
-        }
-
-        return {
-          id: metric.id,
-          month: new Date(metric.month),
-          value: metric.value,
-          type: frontendType,
-          created_at: new Date(metric.created_at),
-          updated_at: new Date(metric.updated_at),
-        };
-      }).filter(Boolean) as HistoricalMetric[] || [];
-      setMetrics(formattedMetrics);
-      setRawMetricsData(formattedMetrics);
-
+      const dbMetrics = (metricsResult.data || []) as DbMetric[]; // Cast fetched data
+      setRawMetricsData(dbMetrics);
+      setMetrics(dbMetrics.map(fromDbMetric).filter((m): m is HistoricalMetric => m !== null));
+      
+      // Fetch initiatives
+      const initiativesResult = await supabaseClient
+        .from('initiatives')
+        .select('*')
+        .order('priority_score', { ascending: true })
+        .order('id');
       if (initiativesResult.error) throw new Error(`Initiatives fetch failed: ${initiativesResult.error.message}`);
-      setInitiatives(initiativesResult.data || []);
+      const dbInitiatives = (initiativesResult.data || []) as DbInitiativeType[]; // Cast fetched data
+      setInitiatives(dbInitiatives.map(fromDbInitiative).filter((i): i is Initiative => i !== null));
 
+      // Fetch capacity
+      const capacityResult = await supabaseClient
+        .from('monthly_capacity')
+        .select('*')
+        .order('month', { ascending: true });
       if (capacityResult.error) throw new Error(`Capacity fetch failed: ${capacityResult.error.message}`);
-      setMonthlyCapacity(capacityResult.data || []);
+      setMonthlyCapacity((capacityResult.data || []) as DbCapacityType[]); // Cast fetched data
 
     } catch (err) {
       console.error("Error fetching page data:", err);
@@ -108,45 +138,39 @@ export default function MetricsPage() {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData, supabaseClient]);
+  }, [fetchData]);
 
-  // --- START: Calculate Schedule and Forecast ---
-  const scheduledInitiativesResult = useMemo(() => {
-    if (!initiatives || !monthlyCapacity) {
+  const scheduledInitiativesResult = useMemo<ScheduleResult>(() => {
+    if (!initiatives.length || !monthlyCapacity.length) {
       return { scheduledInitiatives: [], monthlyAllocation: {} };
     }
-    // TODO: Ensure capacity data covers sufficient future range for scheduling?
-    // For now, assume fetched capacity is sufficient.
     try {
       return calculateRoadmapSchedule(initiatives, monthlyCapacity);
     } catch (error) {
       console.error("Error calculating roadmap schedule:", error);
       setError(error instanceof Error ? error.message : "Failed to calculate schedule");
-      return { scheduledInitiatives: [], monthlyAllocation: {} }; // Return empty on error
+      return { scheduledInitiatives: [], monthlyAllocation: {} };
     }
   }, [initiatives, monthlyCapacity]);
 
   const forecastResult = useMemo<ForecastResult>(() => {
-    // Ensure we have the necessary data for the active tab
     const metricsForForecast = metrics.filter(m => m.type === activeTab);
-    if (metricsForForecast.length < 2) { // Need at least 2 points for trend
-        console.warn(`Not enough historical data for ${activeTab} to calculate forecast.`);
-        return { projectedValues: [] }; // Return minimal object
+    if (metricsForForecast.length < 2) {
+      console.warn(`Not enough historical data for ${activeTab} to calculate forecast.`);
+      return { projectedValues: [] };
     }
-
     try {
-      // Pass the scheduled initiatives and metric type to the forecast function
       return calculateForecast(
         metricsForForecast,
         forecastMonths,
         showConfidenceBands ? confidencePercentage / 100 : undefined,
-        scheduledInitiativesResult.scheduledInitiatives, // Pass calculated schedule
-        activeTab // Pass current metric type
+        scheduledInitiativesResult.scheduledInitiatives,
+        activeTab
       );
     } catch (error) {
       console.error("Error calculating forecast:", error);
       setError(error instanceof Error ? error.message : "Failed to calculate forecast");
-      return { projectedValues: [] }; // Return minimal object on error
+      return { projectedValues: [] };
     }
   }, [
     metrics,
@@ -154,9 +178,8 @@ export default function MetricsPage() {
     forecastMonths,
     showConfidenceBands,
     confidencePercentage,
-    scheduledInitiativesResult // Depend on the calculated schedule
+    scheduledInitiativesResult
   ]);
-  // --- END: Calculate Schedule and Forecast ---
 
   const handleSuccess = () => {
     fetchData();
@@ -168,13 +191,19 @@ export default function MetricsPage() {
 
   const filteredMetrics = metrics
     .filter(metric => metric.type === activeTab)
-    .filter(metric => {
+    .filter((metric: HistoricalMetric) => {
       if (viewMode === 'forecast') {
         return true;
       }
       const date = metric.month instanceof Date ? metric.month : new Date(metric.month);
       if (isNaN(date.getTime())) return false;
-      return date >= dateRange.start && date <= dateRange.end;
+      const startDate = dateRange.start instanceof Date ? dateRange.start : new Date(dateRange.start);
+      const endDate = dateRange.end instanceof Date ? dateRange.end : new Date(dateRange.end);
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return false;
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+      date.setHours(0, 0, 0, 0);
+      return date >= startDate && date <= endDate;
     });
 
   return (
@@ -190,7 +219,7 @@ export default function MetricsPage() {
 
       <div className="bg-white rounded-lg shadow p-6 mb-8">
         <h2 className="text-lg font-semibold mb-4">Add New Metric</h2>
-        <MetricInput onSuccess={handleSuccess} />
+        <MetricInput onSuccess={handleSuccess} onError={handleError} />
       </div>
 
       {error && <ErrorDisplay message={error} onClose={() => setError(null)} />}
@@ -264,7 +293,6 @@ export default function MetricsPage() {
                       metrics={filteredMetrics}
                       metricType={activeTab}
                       dateRange={dateRange}
-                      onDateRangeChange={setDateRange}
                       showDataPoints={showDataPoints}
                       showGrid={showGrid}
                     />
@@ -281,15 +309,13 @@ export default function MetricsPage() {
                       confidencePercentage={confidencePercentage}
                       onConfidencePercentageChange={setConfidencePercentage}
                     />
-                    <div className="relative h-96"> {/* Ensure container has height */}
+                    <div className="relative h-96">
                       <ForecastDisplay
-                        // Pass historical metrics filtered only by type for context
                         metrics={metrics.filter(m => m.type === activeTab)}
                         metricType={activeTab}
                         forecastMonths={forecastMonths}
                         showConfidenceBands={showConfidenceBands}
                         artificialConfidenceDecimal={confidencePercentage / 100}
-                        // Pass ONLY the new adjusted forecast data
                         adjustedForecastValues={forecastResult.adjustedForecastValues}
                       />
                     </div>
@@ -309,4 +335,4 @@ export default function MetricsPage() {
       </div>
     </div>
   );
-} 
+}

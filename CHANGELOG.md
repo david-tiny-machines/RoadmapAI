@@ -33,7 +33,19 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 
 ## [Unreleased]
 
-## [v0.0.4f] - 2025-04-08  // Replace with today's date
+## [v0.0.4g] - 2025-04-08  // Replace with today's date
+### Fixed
+- Resolved multiple build failures caused by various issues:
+    - **ESLint Errors:** Fixed `react/no-unescaped-entities` in `pages/capacity/index.tsx`, `components/initiatives/InitiativeList.tsx`, and `pages/auth/signin.tsx`. Fixed `react-hooks/exhaustive-deps` in `pages/metrics/index.tsx` by wrapping `fetchData` in `useCallback`.
+    - **Next.js Config:** Removed development-only keys (`experimental.allowedDevOrigins`, `webpackDevMiddleware`) from `next.config.js`.
+    - **Type Mismatches:** Corrected inconsistencies between frontend (`Initiative`, `HistoricalMetric`) and database (`DbInitiativeType`) types when calling `calculateRoadmapSchedule` and in utility functions/components (`utils/schedulingUtils.ts`, `pages/capacity/index.tsx`, `pages/roadmap/index.tsx`, `utils/formatters.ts`, `types/metrics.ts`, `components/metrics/MetricTable.tsx`). Standardized on camelCase for frontend types.
+    - **Property Naming:** Fixed snake_case vs camelCase errors (`isMandatory`, `effortEstimate`, `valueLever`, `updatedAt`/`updated_at`, `average_loan_size`/`loan_size`) across multiple files (`components/roadmap/RoadmapGantt.tsx`, `utils/capacityUtils.ts`, `utils/formatters.ts`, `pages/metrics/index.tsx`).
+    - **Unused Code:** Removed unused function `selectInitiativesWithinCapacity` and its import from `utils/prioritizationUtils.ts`.
+    - **Dev Pages:** Deleted unused/problematic pages `pages/dev/storage-debug.tsx` and `pages/dev/test-schedule.tsx`.
+- **Build Process:** Added cache clearing (`rm -rf .next`) to the Replit build command (`.replit`) to mitigate potential build caching issues.
+- **Roadmap Gantt Colors:** Fixed logic in `components/roadmap/RoadmapGantt.tsx` to correctly use `isMandatory` (camelCase) for assigning amber color to mandatory initiatives.
+
+## [v0.0.4f] - 2025-04-08
 ### Changed
 - Modified Supabase Row Level Security (RLS) policies for `initiatives`, `historical_metrics`, and `monthly_capacity` tables to allow all authenticated users read access (`SELECT`) and write access (`INSERT`, `UPDATE`, `DELETE`), replacing previous user-specific policies.
 - Removed client-side `user_id` filters from data fetching logic in `pages/capacity/index.tsx`, `components/initiatives/InitiativeList.tsx`, and `pages/roadmap/index.tsx` to ensure all data permitted by RLS is retrieved.

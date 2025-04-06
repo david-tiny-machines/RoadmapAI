@@ -360,7 +360,7 @@ export default function InitiativeList() {
         </div>
       ) : initiatives.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          No initiatives yet. Click {"\"New Initiative\""} to create one.
+          No initiatives yet. Click &quot;New Initiative&quot; to create one.
         </div>
       ) : (
         <>

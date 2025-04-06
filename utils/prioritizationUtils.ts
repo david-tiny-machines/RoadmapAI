@@ -1,6 +1,6 @@
 import { Initiative } from '../types/initiative';
-import { MonthlyCapacity } from '../types/capacity';
-import { calculateMonthlyEffort } from './capacityUtils';
+// import { MonthlyCapacity } from '../types/capacity';
+// import { calculateMonthlyEffort } from './capacityUtils';
 
 /**
  * Calculates the weighted impact score for an initiative
@@ -57,12 +57,8 @@ export function sortInitiativesByPriority(initiatives: Initiative[]): Initiative
   });
 }
 
-/**
- * Selects initiatives that fit within capacity constraints
- * @param {Initiative[]} initiatives - Array of initiatives to select from
- * @param {MonthlyCapacity[]} monthlyCapacities - Available capacity by month
- * @returns {Initiative[]} Selected initiatives that fit within capacity
- */
+// Remove unused function selectInitiativesWithinCapacity
+/*
 export function selectInitiativesWithinCapacity(
   initiatives: Initiative[],
   monthlyCapacities: MonthlyCapacity[]
@@ -92,4 +88,5 @@ export function selectInitiativesWithinCapacity(
   }
 
   return selected;
-} 
+}
+*/ 

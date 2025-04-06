@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import CapacityManager from '../../components/capacity/CapacityManager';
-// import { Initiative } from '../../types/initiative'; // No longer using raw Initiative type here
+import { Initiative } from '../../types/initiative';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
 import { Database } from '../../types/supabase';
 import { fromDbInitiative, DbInitiativeType, DbCapacityType, fromDbCapacity } from '../../types/database';
-// Update import for new structure
 import { calculateRoadmapSchedule, ScheduledInitiative, MonthlyAllocationMap, ScheduleResult } from '../../utils/schedulingUtils';
 import { MonthlyCapacity } from '../../types/capacity';
 import ErrorDisplay from '../../components/shared/ErrorDisplay';
@@ -103,7 +102,10 @@ export default function Capacity() {
         updated_at: ''
     })).filter(dbCap => dbCap.month);
 
-    return calculateRoadmapSchedule(initiatives, dbCapacities);
+    // Convert DbInitiativeType[] to Initiative[] for the scheduler
+    const frontendInitiatives = initiatives.map(fromDbInitiative).filter((i): i is Initiative => i !== null);
+
+    return calculateRoadmapSchedule(frontendInitiatives, dbCapacities);
   }, [initiatives, monthlyCapacities, loading, user]);
 
   return (
@@ -111,7 +113,7 @@ export default function Capacity() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Capacity Plan</h1>
         <p className="mt-2 text-gray-600">
-          {'View scheduled initiative load against your team\'s available capacity.'}
+          View scheduled initiative load against your team&apos;s available capacity.
         </p>
       </div>
 

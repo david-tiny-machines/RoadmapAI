@@ -70,7 +70,7 @@ export function calculateScheduledMonthlyLoad(
   // Calculate load for each scheduled initiative
   scheduledInitiatives.forEach((initiative) => {
     // Skip initiatives that weren't scheduled or have no effort
-    if (!initiative.roadmap_start_month || !initiative.roadmap_delivery_month || initiative.effort_estimate <= 0) {
+    if (!initiative.roadmap_start_month || !initiative.roadmap_delivery_month || initiative.effortEstimate <= 0) {
       return;
     }
 
@@ -92,7 +92,7 @@ export function calculateScheduledMonthlyLoad(
         return;
       }
 
-      const effortPerMonth = initiative.effort_estimate / durationInMonths;
+      const effortPerMonth = initiative.effortEstimate / durationInMonths;
 
       // Iterate through the capacity months and allocate effort if initiative is active
       monthlyCapacities.forEach(({ month }) => {

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useSupabaseClient, useSessionContext } from '@supabase/auth-helpers-react';
 import { Database } from '@/types/supabase';
+import { Initiative, fromDbInitiative } from '@/types/database';
 import { calculateRoadmapSchedule, ScheduledInitiative } from '@/utils/schedulingUtils';
 import RoadmapGantt from '@/components/roadmap/RoadmapGantt';
 import ErrorDisplay from '@/components/shared/ErrorDisplay';
 
-type Initiative = Database['public']['Tables']['initiatives']['Row'];
-type Capacity = Database['public']['Tables']['monthly_capacity']['Row'];
+type DbInitiative = Database['public']['Tables']['initiatives']['Row'];
+type DbCapacity = Database['public']['Tables']['monthly_capacity']['Row'];
 
 const RoadmapPage: React.FC = () => {
   const supabase = useSupabaseClient<Database>();
@@ -38,6 +39,11 @@ const RoadmapPage: React.FC = () => {
 
         if (initiativesError) throw new Error(`Failed to fetch initiatives: ${initiativesError.message}`);
         if (!initiativesData) throw new Error('No initiatives data returned from query.');
+        
+        // Convert fetched DbInitiative[] to Initiative[]
+        const frontendInitiatives = (initiativesData as DbInitiative[])
+            .map(fromDbInitiative)
+            .filter((i): i is Initiative => i !== null);
 
         // Fetch Capacity
         const { data: capacityData, error: capacityError } = await supabase
@@ -47,10 +53,11 @@ const RoadmapPage: React.FC = () => {
 
         if (capacityError) throw new Error(`Failed to fetch capacity: ${capacityError.message}`);
         if (!capacityData) throw new Error('No capacity data returned from query. Please set capacity.');
+        
+        const dbCapacity = capacityData as DbCapacity[]; // Ensure correct type for scheduler
 
-        // Calculate Schedule
-        const scheduleResult = calculateRoadmapSchedule(initiativesData, capacityData);
-        // Extract the array from the result object
+        // Calculate Schedule using frontendInitiatives
+        const scheduleResult = calculateRoadmapSchedule(frontendInitiatives, dbCapacity);
         setScheduledInitiatives(scheduleResult.scheduledInitiatives);
 
       } catch (err) {

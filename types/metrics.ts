@@ -5,8 +5,8 @@ export interface HistoricalMetric {
   month: Date;
   value: number;
   type: DbMetricType;
-  created_at: Date;
-  updated_at: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface HistoricalMetricDisplay {

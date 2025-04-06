@@ -1,7 +1,21 @@
-import { DbCapacityType, DbInitiativeType } from '../types/database';
+import { DbCapacityType } from '../types/database';
+import { Initiative } from '../types/database'; // Import frontend Initiative type
 import { formatDateToYYYYMMDD } from './dateUtils'; // Assuming dateUtils exists
+import { calculatePriorityScore } from './prioritizationUtils'; // Import priority calculation
 
-export type ScheduledInitiative = DbInitiativeType & {
+export type ScheduledInitiative = {
+  id: string;
+  userId: string;
+  name: string;
+  valueLever: Initiative['valueLever']; // Use Initiative type fields
+  uplift: number;
+  confidence: number;
+  effortEstimate: number;
+  startMonth: string | null;
+  endMonth: string | null;
+  isMandatory: boolean;
+  createdAt: string;
+  updatedAt: string;
   roadmap_delivery_month: string | null; // YYYY-MM-DD or null if unscheduled
   deadline_missed: boolean; // True if roadmap_delivery_month > end_month
   roadmap_start_month: string | null; // YYYY-MM-DD or null if unscheduled
@@ -26,12 +40,12 @@ export interface ScheduleResult {
  * Respects initiative.start_month as the earliest allocation month.
  * Flags initiatives where roadmap_delivery_month exceeds initiative.end_month.
  *
- * @param initiatives - Array of initiatives to schedule (DbInitiativeType).
+ * @param initiatives - Array of initiatives to schedule (Initiative[]).
  * @param capacity - Array of monthly capacity data (DbCapacityType), MUST cover the planning horizon.
  * @returns An object containing scheduledInitiatives array and monthlyAllocation map.
  */
 export const calculateRoadmapSchedule = (
-  initiatives: DbInitiativeType[],
+  initiatives: Initiative[], // Changed parameter type
   capacity: DbCapacityType[],
 ): ScheduleResult => { // Return type updated
   const emptyResult: ScheduleResult = { scheduledInitiatives: [], monthlyAllocation: {} };
@@ -41,22 +55,23 @@ export const calculateRoadmapSchedule = (
   }
   if (!capacity || capacity.length === 0) {
     // Cannot schedule without capacity info
-    const unscheduled = initiatives.map((initiative) => ({
+    const tempUnscheduled = initiatives.map((initiative) => ({
       ...initiative,
       roadmap_delivery_month: null,
       deadline_missed: false,
       roadmap_start_month: null,
     }));
-    return { scheduledInitiatives: unscheduled, monthlyAllocation: {} };
+    return { scheduledInitiatives: tempUnscheduled, monthlyAllocation: {} };
   }
 
   // 1. Sort Initiatives: Mandatory first, then by priority_score descending
   const sortedInitiatives = [...initiatives].sort((a, b) => {
-    if (a.is_mandatory !== b.is_mandatory) {
-      return a.is_mandatory ? -1 : 1;
+    if (a.isMandatory !== b.isMandatory) { // Use isMandatory
+      return a.isMandatory ? -1 : 1;
     }
-    const scoreA = a.priority_score ?? -Infinity;
-    const scoreB = b.priority_score ?? -Infinity;
+    // Calculate priority score on the fly for sorting
+    const scoreA = calculatePriorityScore(a);
+    const scoreB = calculatePriorityScore(b);
     return scoreB - scoreA;
   });
 
@@ -80,8 +95,8 @@ export const calculateRoadmapSchedule = (
 
   if (capacityMonths.length === 0) {
      console.error("No valid capacity months found for scheduling.");
-     const unscheduled = initiatives.map(initiative => ({ ...initiative, roadmap_delivery_month: null, deadline_missed: false, roadmap_start_month: null }));
-     return { scheduledInitiatives: unscheduled, monthlyAllocation: {} };
+     const tempUnscheduled = initiatives.map(initiative => ({ ...initiative, roadmap_delivery_month: null, deadline_missed: false, roadmap_start_month: null }));
+     return { scheduledInitiatives: tempUnscheduled, monthlyAllocation: {} };
   }
 
 
@@ -89,14 +104,19 @@ export const calculateRoadmapSchedule = (
   const scheduledInitiativesMap = new Map<string, ScheduledInitiative>(
     initiatives.map(initiative => [
       initiative.id,
-      { ...initiative, roadmap_delivery_month: null, deadline_missed: false, roadmap_start_month: null },
+      { 
+        ...initiative, // Spread frontend fields
+        roadmap_delivery_month: null, 
+        deadline_missed: false, 
+        roadmap_start_month: null 
+      },
     ])
   );
   const monthlyAllocation: MonthlyAllocationMap = {}; // New: Initialize allocation map
 
   // 4. Iterate & Allocate Effort
   for (const initiative of sortedInitiatives) {
-    let effortRemaining = initiative.effort_estimate;
+    let effortRemaining = initiative.effortEstimate; // Use effortEstimate
     let deliveryMonth: string | null = null;
     let startMonth: string | null = null;
     let deadline_missed = false;
@@ -119,18 +139,18 @@ export const calculateRoadmapSchedule = (
 
     // Determine the starting month index for allocation
     let startMonthIndex = 0;
-    if (initiative.start_month) {
-      const initiativeStartDate = new Date(initiative.start_month);
+    if (initiative.startMonth) { // Use startMonth
+      const initiativeStartDate = new Date(initiative.startMonth);
       const foundIndex = capacityMonths.findIndex(month => new Date(month) >= initiativeStartDate);
       if (foundIndex !== -1) {
         startMonthIndex = foundIndex;
       } else {
-        console.warn(`Initiative ${initiative.id} start month ${initiative.start_month} is after the capacity horizon.`);
+        console.warn(`Initiative ${initiative.id} start month ${initiative.startMonth} is after the capacity horizon.`);
         const initiativeToUpdate = scheduledInitiativesMap.get(initiative.id);
         if (initiativeToUpdate) {
           initiativeToUpdate.roadmap_delivery_month = null;
           initiativeToUpdate.roadmap_start_month = null;
-          initiativeToUpdate.deadline_missed = !!initiative.end_month;
+          initiativeToUpdate.deadline_missed = !!initiative.endMonth;
         }
         continue;
       }
@@ -172,10 +192,10 @@ export const calculateRoadmapSchedule = (
     }
 
     // 5. Check Deadline
-    if (deliveryMonth && initiative.end_month) {
+    if (deliveryMonth && initiative.endMonth) { // Use endMonth
       try {
         const deliveryDate = new Date(deliveryMonth);
-        const deadlineDate = new Date(initiative.end_month);
+        const deadlineDate = new Date(initiative.endMonth);
         if (!isNaN(deliveryDate.getTime()) && !isNaN(deadlineDate.getTime())) {
             if (deliveryDate > deadlineDate) {
                 deadline_missed = true;
@@ -184,7 +204,7 @@ export const calculateRoadmapSchedule = (
       } catch (e) {
         console.error(`Error comparing dates for initiative ${initiative.id}:`, e);
       }
-    } else if (!deliveryMonth && initiative.end_month) {
+    } else if (!deliveryMonth && initiative.endMonth) { // Use endMonth
       deadline_missed = true;
     }
 
@@ -200,7 +220,13 @@ export const calculateRoadmapSchedule = (
   // 7. Convert map back to array, preserving the sort order
   const finalResults: ScheduledInitiative[] = sortedInitiatives.map(init => {
     const scheduledData = scheduledInitiativesMap.get(init.id);
-    return scheduledData || { ...init, roadmap_delivery_month: null, deadline_missed: false, roadmap_start_month: null };
+    // Ensure the returned object matches the ScheduledInitiative type
+    return scheduledData || { 
+        ...init, // Spread frontend Initiative fields
+        roadmap_delivery_month: null, 
+        deadline_missed: false, 
+        roadmap_start_month: null 
+    };
   });
 
   return { // Return updated structure
