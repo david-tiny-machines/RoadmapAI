@@ -1,89 +1,30 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MonthlyCapacity } from '../../types/capacity';
-import { getNextNMonths, formatMonthYear, getDefaultCapacity, fromMonthString, formatDateToYYYYMMDD } from '../../utils/dateUtils';
+import { formatMonthYear, fromMonthString, formatDateToYYYYMMDD } from '../../utils/dateUtils';
 import CapacityChart from './CapacityChart';
-import { Initiative } from '../../types/initiative';
+import { ScheduledInitiative, MonthlyAllocationMap } from '../../utils/schedulingUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
-import { DbCapacityType, fromDbCapacity, toDbCapacity } from '../../types/database';
+import { toDbCapacity } from '../../types/database';
 import ErrorDisplay from '../shared/ErrorDisplay';
 
-const MONTHS_TO_SHOW = 12;
-
 interface CapacityManagerProps {
-  initiatives?: Initiative[];
+  scheduledInitiatives: ScheduledInitiative[];
+  monthlyCapacities: MonthlyCapacity[];
+  monthlyAllocation: MonthlyAllocationMap;
 }
 
-export default function CapacityManager({ initiatives = [] }: CapacityManagerProps) {
+export default function CapacityManager({ scheduledInitiatives, monthlyCapacities, monthlyAllocation }: CapacityManagerProps) {
   const { user } = useAuth();
   const supabase = useSupabaseClient();
 
-  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [monthlyCapacities, setMonthlyCapacities] = useState<MonthlyCapacity[]>([]);
+  const [currentMonthlyCapacities, setCurrentMonthlyCapacities] = useState<MonthlyCapacity[]>(monthlyCapacities);
   const [bulkUpdateValue, setBulkUpdateValue] = useState<string>('');
 
-  const getDefaultCapacities = useCallback((): MonthlyCapacity[] => {
-    const months = getNextNMonths(MONTHS_TO_SHOW);
-    return months.map(month => ({
-      month,
-      availableDays: getDefaultCapacity(),
-    }));
-  }, []);
-
   useEffect(() => {
-    const fetchCapacity = async () => {
-      if (!user) {
-        setError("User not logged in.");
-        setLoading(false);
-        setMonthlyCapacities(getDefaultCapacities());
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        const defaultMonths = getDefaultCapacities();
-        const firstMonthStr = defaultMonths[0].month;
-        const lastMonthStr = defaultMonths[defaultMonths.length - 1].month;
-        const firstMonthDbFormat = formatDateToYYYYMMDD(fromMonthString(firstMonthStr));
-        const lastMonthDbFormat = formatDateToYYYYMMDD(fromMonthString(lastMonthStr));
-
-        if (!firstMonthDbFormat || !lastMonthDbFormat) {
-          throw new Error("Could not determine date range for fetching capacity.");
-        }
-
-        const { data, error: dbError } = await supabase
-          .from('monthly_capacity')
-          .select('*')
-          .eq('user_id', user.id)
-          .gte('month', firstMonthDbFormat)
-          .lte('month', lastMonthDbFormat)
-          .order('month', { ascending: true });
-
-        if (dbError) throw dbError;
-
-        const fetchedCapacities: MonthlyCapacity[] = data.map((dbCap: DbCapacityType) => fromDbCapacity(dbCap));
-
-        const mergedCapacities = defaultMonths.map(defaultCap => {
-          const fetched = fetchedCapacities.find(fc => fc.month === defaultCap.month);
-          return fetched || defaultCap;
-        });
-
-        setMonthlyCapacities(mergedCapacities);
-
-      } catch (err: any) {
-        console.error("Error fetching capacity data:", err);
-        setError(`Failed to load capacity data: ${err.message || 'Unknown error'}`);
-        setMonthlyCapacities(getDefaultCapacities());
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCapacity();
-  }, [user, supabase, getDefaultCapacities]);
+    setCurrentMonthlyCapacities(monthlyCapacities);
+  }, [monthlyCapacities]);
 
   const handleCapacityChange = async (month: string, value: number) => {
     if (!user) {
@@ -94,8 +35,8 @@ export default function CapacityManager({ initiatives = [] }: CapacityManagerPro
 
     const updatedValue = isNaN(value) || value < 0 ? 0 : Math.round(value);
 
-    const originalCapacities = monthlyCapacities;
-    setMonthlyCapacities(prev =>
+    const originalCapacities = currentMonthlyCapacities;
+    setCurrentMonthlyCapacities(prev =>
       prev.map(mc =>
         mc.month === month ? { ...mc, availableDays: updatedValue } : mc
       )
@@ -114,7 +55,7 @@ export default function CapacityManager({ initiatives = [] }: CapacityManagerPro
     } catch (err: any) {
       console.error("Error saving capacity:", err);
       setError(`Failed to save capacity for ${formatMonthYear(month)}: ${err.message || 'Unknown error'}`);
-      setMonthlyCapacities(originalCapacities);
+      setCurrentMonthlyCapacities(originalCapacities);
     }
   };
 
@@ -132,12 +73,12 @@ export default function CapacityManager({ initiatives = [] }: CapacityManagerPro
     }
     const roundedValue = Math.round(value);
 
-    const originalCapacities = monthlyCapacities;
-    const updatedCapacities = monthlyCapacities.map(item => ({
+    const originalCapacities = currentMonthlyCapacities;
+    const updatedCapacities = currentMonthlyCapacities.map(item => ({
       ...item,
       availableDays: roundedValue
     }));
-    setMonthlyCapacities(updatedCapacities);
+    setCurrentMonthlyCapacities(updatedCapacities);
 
     try {
       const dbDataArray = updatedCapacities.map(cap => toDbCapacity(cap, user.id));
@@ -153,21 +94,9 @@ export default function CapacityManager({ initiatives = [] }: CapacityManagerPro
     } catch (err: any) {
         console.error("Error performing bulk capacity update:", err);
         setError(`Failed to save bulk capacity update: ${err.message || 'Unknown error'}`);
-        setMonthlyCapacities(originalCapacities);
+        setCurrentMonthlyCapacities(originalCapacities);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="bg-white p-6 rounded-xl shadow-soft">
-          <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -175,7 +104,7 @@ export default function CapacityManager({ initiatives = [] }: CapacityManagerPro
 
       <div className="bg-white p-6 rounded-xl shadow-soft">
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-          <h3 className="text-lg font-semibold text-gray-900">Monthly Capacity</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Set Monthly Capacity</h3>
           <div className="flex items-center space-x-2">
               <input
                 type="number"
@@ -196,7 +125,7 @@ export default function CapacityManager({ initiatives = [] }: CapacityManagerPro
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {monthlyCapacities.map((item) => (
+          {currentMonthlyCapacities.map((item) => (
             <div key={item.month} className="p-4 border border-gray-200 rounded-lg">
               <h4 className="font-medium text-gray-900 mb-2">{formatMonthYear(item.month)}</h4>
               <input
@@ -212,8 +141,11 @@ export default function CapacityManager({ initiatives = [] }: CapacityManagerPro
           ))}
         </div>
       </div>
-      {!loading && monthlyCapacities.length > 0 &&
-        <CapacityChart initiatives={initiatives} monthlyCapacities={monthlyCapacities} />
+      {currentMonthlyCapacities.length > 0 &&
+        <CapacityChart
+          monthlyCapacities={currentMonthlyCapacities}
+          monthlyAllocation={monthlyAllocation}
+        />
       }
     </div>
   );

@@ -6,7 +6,7 @@
 
 -- Ensure clean slate (Optional: Use with caution!)
 -- ALTER TABLE historical_metrics DISABLE ROW LEVEL SECURITY; -- RLS might prevent direct delete without specific policy or disabling RLS temporarily
--- DELETE FROM historical_metrics WHERE ... ; 
+-- DELETE FROM historical_metrics;
 -- ALTER TABLE historical_metrics ENABLE ROW LEVEL SECURITY;
 -- DELETE FROM monthly_capacity WHERE user_id = '3578ff51-28af-4f04-b376-0c1a621d48cc';
 -- DELETE FROM initiatives WHERE user_id = '3578ff51-28af-4f04-b376-0c1a621d48cc';

@@ -145,4 +145,34 @@ export function formatDateToYYYYMMDD(date: Date | null): string | null {
 export function getDefaultCapacity(): number {
   // Assuming 5 working days per week, ~4 weeks per month
   return 20;
+}
+
+/**
+ * Calculates the number of months between two dates, inclusive.
+ * @param {Date} startDate - The start date.
+ * @param {Date} endDate - The end date.
+ * @returns {number} The number of months between the dates (inclusive).
+ */
+export function getMonthsBetween(startDate: Date, endDate: Date): number {
+  if (!(startDate instanceof Date) || !(endDate instanceof Date) || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    console.warn("getMonthsBetween received invalid Date objects");
+    return 0;
+  }
+
+  // Ensure start date is before or equal to end date
+  if (startDate > endDate) {
+    console.warn("getMonthsBetween: startDate is after endDate");
+    return 0; // Or swap them, depending on desired behavior
+  }
+
+  const startYear = startDate.getUTCFullYear();
+  const startMonth = startDate.getUTCMonth();
+  const endYear = endDate.getUTCFullYear();
+  const endMonth = endDate.getUTCMonth();
+
+  // Calculate the difference in months
+  const monthDiff = (endYear - startYear) * 12 + (endMonth - startMonth);
+
+  // Add 1 for inclusive count
+  return monthDiff + 1;
 } 

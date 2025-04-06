@@ -1,6 +1,7 @@
 import { Initiative } from '../types/initiative';
 import { MonthlyCapacity } from '../types/capacity';
-import { fromMonthString, formatDateToYYYYMMDD } from './dateUtils'; // Import necessary date utils
+import { fromMonthString, formatDateToYYYYMMDD, getMonthsBetween } from './dateUtils'; // Import necessary date utils
+import { ScheduledInitiative } from './schedulingUtils'; // Import the scheduled type
 
 /**
  * Represents the effort allocation for a specific month
@@ -20,6 +21,13 @@ export interface MonthlyEffort {
   optionalEffort: number;
 }
 
+// New Interface for Scheduled Load
+export interface MonthlyScheduledLoad {
+  month: string; // YYYY-MM-DD format (or YYYY-MM, ensure consistency)
+  availableDays: number;
+  scheduledLoad: number;
+}
+
 // Helper function to safely format a date string (or Date object) to YYYY-MM
 function getYearMonthString(dateInput: string | Date | null): string | null {
   if (!dateInput) return null;
@@ -34,106 +42,91 @@ function getYearMonthString(dateInput: string | Date | null): string | null {
 }
 
 /**
- * Calculates the monthly effort distribution for a set of initiatives
- * @param {Initiative[]} initiatives - Array of initiatives to calculate effort for
- * @param {MonthlyCapacity[]} monthlyCapacities - Array of monthly capacity values
- * @returns {MonthlyEffort[]} Array of monthly effort calculations
- * 
- * @description
- * For each initiative, the function:
- * 1. Determines start and end dates (uses defaults if not specified)
- * 2. Distributes effort evenly across the initiative's duration
- * 3. Categorizes effort as mandatory or optional
- * 4. Aggregates effort by month
+ * Calculates the scheduled monthly effort load based on capacity-constrained schedule.
+ * @param scheduledInitiatives - Array of initiatives with calculated start/delivery months.
+ * @param monthlyCapacities - Array of monthly capacity values.
+ * @returns Array of monthly scheduled load calculations.
  */
+export function calculateScheduledMonthlyLoad(
+  scheduledInitiatives: ScheduledInitiative[] = [],
+  monthlyCapacities: MonthlyCapacity[] = []
+): MonthlyScheduledLoad[] {
+  if (!monthlyCapacities?.length) {
+    console.warn('calculateScheduledMonthlyLoad called with empty monthlyCapacities');
+    return [];
+  }
+
+  // Initialize monthly load data
+  const monthlyLoadMap = new Map<string, MonthlyScheduledLoad>();
+  monthlyCapacities.forEach(({ month, availableDays }) => {
+    // Use the YYYY-MM format consistent with MonthlyCapacity
+    monthlyLoadMap.set(month, {
+      month,
+      availableDays,
+      scheduledLoad: 0,
+    });
+  });
+
+  // Calculate load for each scheduled initiative
+  scheduledInitiatives.forEach((initiative) => {
+    // Skip initiatives that weren't scheduled or have no effort
+    if (!initiative.roadmap_start_month || !initiative.roadmap_delivery_month || initiative.effort_estimate <= 0) {
+      return;
+    }
+
+    try {
+      const startDate = new Date(initiative.roadmap_start_month);
+      const endDate = new Date(initiative.roadmap_delivery_month);
+
+      // Ensure dates are valid
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+          console.warn(`Invalid start/delivery date for initiative ${initiative.id}: ${initiative.roadmap_start_month} / ${initiative.roadmap_delivery_month}`);
+          return;
+      }
+
+      // Calculate duration in months (inclusive)
+      const durationInMonths = getMonthsBetween(startDate, endDate);
+
+      if (durationInMonths <= 0) {
+        console.warn(`Invalid duration for initiative ${initiative.id}: Start ${initiative.roadmap_start_month}, End ${initiative.roadmap_delivery_month}`);
+        return;
+      }
+
+      const effortPerMonth = initiative.effort_estimate / durationInMonths;
+
+      // Iterate through the capacity months and allocate effort if initiative is active
+      monthlyCapacities.forEach(({ month }) => {
+         // Convert capacity month (YYYY-MM) and initiative dates (YYYY-MM-DD) to comparable format (e.g., Date objects)
+         const currentMonthDate = fromMonthString(month);
+         // Compare month range, inclusive
+         if (currentMonthDate >= startDate && currentMonthDate <= endDate) {
+            const monthData = monthlyLoadMap.get(month);
+            if (monthData) {
+                monthData.scheduledLoad += effortPerMonth;
+            }
+         }
+      });
+
+    } catch (e) {
+        console.error(`Error processing initiative ${initiative.id} for scheduled load:`, e);
+    }
+  });
+
+  // Round load to avoid floating point display issues
+  const results = Array.from(monthlyLoadMap.values());
+  results.forEach(res => {
+    res.scheduledLoad = parseFloat(res.scheduledLoad.toFixed(2));
+  });
+
+  return results;
+}
+
+// Remove or comment out the old calculateMonthlyEffort function
+/*
 export function calculateMonthlyEffort(
   initiatives: Initiative[] = [],
   monthlyCapacities: MonthlyCapacity[] = []
 ): MonthlyEffort[] {
-  if (!monthlyCapacities?.length) {
-    console.warn('calculateMonthlyEffort called with empty monthlyCapacities');
-    return [];
-  }
-
-  // Get the range of months we are calculating for
-  const capacityMonthStrings = monthlyCapacities.map(mc => mc.month); // Should be YYYY-MM
-  const firstMonthStr = capacityMonthStrings[0];
-  const lastMonthStr = capacityMonthStrings[capacityMonthStrings.length - 1];
-
-  // Initialize monthly effort data
-  const monthlyEffortMap = new Map<string, MonthlyEffort>();
-  monthlyCapacities.forEach(({ month, availableDays }) => {
-    monthlyEffortMap.set(month, {
-      month,
-      availableDays,
-      totalEffort: 0,
-      mandatoryEffort: 0,
-      optionalEffort: 0,
-    });
-  });
-
-  // Calculate effort for each initiative
-  initiatives.forEach((initiative) => {
-    // --- Date Handling --- 
-    // Use helper function for consistent YYYY-MM format
-    const startMonthStr = getYearMonthString(initiative.startMonth) || firstMonthStr;
-    const endMonthStr = getYearMonthString(initiative.endMonth) || lastMonthStr;
-
-    // Skip initiative if its date range is invalid or completely outside the capacity window
-    if (!startMonthStr || !endMonthStr || startMonthStr > lastMonthStr || endMonthStr < firstMonthStr) {
-      return; 
-    }
-
-    // Clamp the initiative's effective range to the capacity window for calculation
-    const effectiveStartMonth = startMonthStr < firstMonthStr ? firstMonthStr : startMonthStr;
-    const effectiveEndMonth = endMonthStr > lastMonthStr ? lastMonthStr : endMonthStr;
-
-    // Calculate duration in months based on the *effective* range
-    const startDate = fromMonthString(effectiveStartMonth);
-    const endDate = fromMonthString(effectiveEndMonth);
-
-    // Check for invalid dates from fromMonthString before calculation
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      console.warn('Skipping initiative due to invalid effective date range:', initiative.name, effectiveStartMonth, effectiveEndMonth);
-      return;
-    }
-    
-    const monthCount = (endDate.getFullYear() - startDate.getFullYear()) * 12 
-                      + endDate.getMonth() - startDate.getMonth() + 1;
-    
-    // Avoid division by zero or negative month counts
-    if (monthCount <= 0) {
-        console.warn('Skipping initiative due to invalid month count:', initiative.name, monthCount);
-        return;
-    }
-    
-    const effortPerMonth = initiative.effortEstimate / monthCount;
-
-    // --- Effort Allocation --- 
-    capacityMonthStrings.forEach((currentMonthStr) => {
-      // Allocate effort if currentMonth is within the initiative's *effective* date range
-      if (currentMonthStr >= effectiveStartMonth && currentMonthStr <= effectiveEndMonth) {
-        const monthData = monthlyEffortMap.get(currentMonthStr);
-        if (monthData) {
-          const effortToAdd = effortPerMonth; // Keep even distribution for now
-          monthData.totalEffort += effortToAdd;
-          if (initiative.isMandatory) {
-            monthData.mandatoryEffort += effortToAdd;
-          } else {
-            monthData.optionalEffort += effortToAdd;
-          }
-        }
-      }
-    });
-  });
-
-  // Round efforts to avoid floating point display issues
-  const results = Array.from(monthlyEffortMap.values());
-  results.forEach(res => {
-      res.totalEffort = parseFloat(res.totalEffort.toFixed(2));
-      res.mandatoryEffort = parseFloat(res.mandatoryEffort.toFixed(2));
-      res.optionalEffort = parseFloat(res.optionalEffort.toFixed(2));
-  });
-
-  return results;
-} 
+  // ... old implementation ...
+}
+*/ 

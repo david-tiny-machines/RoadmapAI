@@ -33,6 +33,30 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 
 ## [Unreleased]
 
+## [v0.0.4c] - 2025-04-06 // Replace with today's date
+### Added
+- Enhanced `calculateRoadmapSchedule` utility (`utils/schedulingUtils.ts`) to calculate and return `roadmap_start_month` and a detailed `monthlyAllocation` map showing effort allocated per initiative per month.
+- Added `getMonthsBetween` utility function to `utils/dateUtils.ts`.
+- Added `calculateScheduledMonthlyLoad` function to `utils/capacityUtils.ts` to accurately calculate total scheduled effort per month based on the scheduler's detailed allocation.
+
+### Changed
+- Updated `ScheduledInitiative` type definition to include `roadmap_start_month`.
+- Updated `calculateRoadmapSchedule` return type to `ScheduleResult` object containing both `scheduledInitiatives` and `monthlyAllocation`.
+- Refactored Capacity page (`pages/capacity/index.tsx`) to fetch initiative and capacity data, call the enhanced `calculateRoadmapSchedule`, and pass schedule results (`scheduledInitiatives`, `monthlyAllocation`, `monthlyCapacities`) down.
+- Refactored `CapacityManager` component (`components/capacity/CapacityManager.tsx`) to receive schedule/allocation data via props, removing internal data fetching logic.
+- Refactored `CapacityChart` component (`components/capacity/CapacityChart.tsx`):
+    - Now uses the detailed `monthlyAllocation` map to calculate and display the precise `scheduledLoad` per month.
+    - Chart displays `scheduledLoad` (Bar) vs `availableDays` (Line).
+    - Over-capacity warning (`CapacityWarning`) logic updated to use the accurate `scheduledLoad`.
+    - Bar coloring now highlights actual over-capacity based on precise monthly allocation (though less likely to occur naturally now).
+- Updated titles and descriptions on the Capacity page and chart for clarity.
+
+### Fixed
+- Fixed regression on Roadmap page (`pages/roadmap/index.tsx`) where it failed to render because it expected an array from `calculateRoadmapSchedule` instead of the new `ScheduleResult` object.
+
+### Removed
+- Removed usage of the previous `calculateMonthlyEffort` function from `CapacityChart` (function deprecated in `utils/capacityUtils.ts`).
+
 ## [v0.0.4b] - 2025-04-06  // Replace with today's date
 ### Added
 - Created Roadmap page (`pages/roadmap/index.tsx`) to display the calculated schedule.

@@ -51,8 +51,9 @@ const RoadmapPage: React.FC = () => {
         if (!capacityData) throw new Error('No capacity data returned from query. Please set capacity.');
 
         // Calculate Schedule
-        const schedule = calculateRoadmapSchedule(initiativesData, capacityData);
-        setScheduledInitiatives(schedule);
+        const scheduleResult = calculateRoadmapSchedule(initiativesData, capacityData);
+        // Extract the array from the result object
+        setScheduledInitiatives(scheduleResult.scheduledInitiatives);
 
       } catch (err) {
         console.error('Error fetching data or calculating schedule:', err);
