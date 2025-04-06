@@ -33,6 +33,32 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 
 ## [Unreleased]
 
+## [v0.0.4b] - 2025-04-06  // Replace with today's date
+### Added
+- Created Roadmap page (`pages/roadmap/index.tsx`) to display the calculated schedule.
+- Implemented data fetching for initiatives and capacity on the Roadmap page.
+- Integrated `calculateRoadmapSchedule` utility on the Roadmap page.
+- Created `RoadmapGantt` component (`components/roadmap/RoadmapGantt.tsx`) using Recharts (`BarChart`).
+  - Visualizes scheduled initiatives based on `roadmap_delivery_month` (as markers, not duration bars).
+  - Includes tooltips showing initiative details (name, delivery month, effort, formatted value lever).
+  - Colors bars based on `value_lever` and uses red for `deadline_missed` items.
+
+### Changed
+- Updated `tsconfig.json` to correctly configure `@/*` path aliases.
+- Refactored `RoadmapGantt` tooltip to ensure legibility (light background, dark text) and format `value_lever` display.
+
+### Fixed
+- Removed redundant `<MainLayout>` wrapper from `pages/roadmap/index.tsx` to fix duplicate navigation header.
+- Resolved compilation error on Roadmap page caused by missing component export/definition.
+- Corrected type mismatch for `valueLever` prop passed to `getValueLeverDisplay` in `RoadmapGantt` tooltip.
+
+### Removed
+- Removed `<ResponsiveContainer>` from `RoadmapGantt` temporarily due to persistent linter errors; chart uses fixed width for now.
+
+### Known Issues
+- Linter error related to `<ResponsiveContainer>` in `RoadmapGantt` needs further investigation if responsiveness is required.
+- Forecasting logic (now planned for v0.0.4e) needs revision to handle `uplift` consistently as a percentage (carried over from v0.0.4a).
+
 ## [v0.0.4a] - 2025-04-06
 ### Added
 - Created SQL seed script (`db/seeds/01_test_data.sql`) to populate `historical_metrics`, `monthly_capacity`, and `initiatives` with test data, including date constraints.
