@@ -78,11 +78,6 @@ const RoadmapPage: React.FC = () => {
                 {/* Remove placeholder text */}
                 {/* <p className="mb-4">Roadmap Gantt chart will be displayed here once the component is created.</p> */}
                 <RoadmapGantt scheduledInitiatives={scheduledInitiatives} />
-                {/* Optionally keep or remove debug output */}
-                <h2 className="text-lg font-medium mt-6 mb-2">Calculated Schedule Data (Debug):</h2>
-                <pre className="mt-4 p-2 bg-gray-100 dark:bg-gray-800 rounded overflow-x-auto text-xs">
-                  {JSON.stringify(scheduledInitiatives, null, 2)}
-                </pre>
             </div>
          ) : (
             <p>No initiatives scheduled. Ensure you have added initiatives and set monthly capacity.</p>

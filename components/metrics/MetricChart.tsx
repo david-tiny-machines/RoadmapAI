@@ -17,7 +17,7 @@ const formatValue = (value: number, type: DbMetricType) => {
     case 'conversion':
     case 'interest_rate':
       return `${value.toFixed(2)}%`;
-    case 'loan_size':
+    case 'average_loan_size':
       return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     default:
       return value.toFixed(2);
@@ -27,7 +27,6 @@ const formatValue = (value: number, type: DbMetricType) => {
 const MetricChart: React.FC<MetricChartProps> = ({
   metrics,
   metricType,
-  dateRange,
   showDataPoints = true,
   showGrid = true
 }) => {
@@ -42,6 +41,15 @@ const MetricChart: React.FC<MetricChartProps> = ({
   // Sort metrics by date
   const sortedData = [...metrics].sort((a, b) => a.month.getTime() - b.month.getTime());
 
+  // --- Calculate Y-axis Min/Max for Centering --- 
+  const yValues = sortedData.map(m => m.value);
+  const yMin = yValues.length > 0 ? Math.min(...yValues) : 0;
+  const yMax = yValues.length > 0 ? Math.max(...yValues) : 100; // Default max if no data
+  const yPadding = (yMax - yMin) * 0.1; // 10% padding
+  const yDomainMin = Math.max(0, yMin - yPadding); // Don't go below 0, especially for rates/percentages
+  const yDomainMax = yMax + yPadding;
+  // --- End Y-axis Calculation --- 
+
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -53,17 +61,17 @@ const MetricChart: React.FC<MetricChartProps> = ({
           <XAxis
             dataKey="month"
             tickFormatter={(date: Date) => formatMonthYearFromDate(date)}
-            type="category"
           />
           <YAxis
             tickFormatter={(value: number) => formatValue(value, metricType)}
+            domain={[yDomainMin, yDomainMax]}
           />
           <Tooltip
             labelFormatter={(date: Date) => formatMonthYearFromDate(date)}
             formatter={(value: number) => [formatValue(value as number, metricType), METRIC_TYPE_DISPLAY[metricType]]}
           />
           <Line
-            type="monotone"
+            type="linear"
             dataKey="value"
             stroke="#3B82F6"
             strokeWidth={2}

@@ -33,7 +33,39 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 
 ## [Unreleased]
 
-## [v0.0.4c] - 2025-04-06 // Replace with today's date
+## [v0.0.4d] - 2025-04-08
+### Changed
+- **Roadmap Gantt Chart (`components/roadmap/RoadmapGantt.tsx`)**:
+  - Now renders duration bars spanning calculated `roadmap_start_month` to `roadmap_delivery_month`.
+  - Implemented horizontal scrolling with width dynamically calculated based on schedule duration (approx. 900px/year scale).
+  - Simplified color scheme for clarity: Red (deadline missed), Amber (mandatory & on time), Blue (optional & on time).
+  - Updated tooltip to show start/delivery months and a "Mandatory" badge styled like the Initiatives page.
+  - Resolved various bar rendering issues to ensure accurate visual width.
+  - Removed fixed width and `ResponsiveContainer` in favor of scrolling wrapper.
+- **Roadmap Page (`pages/roadmap/index.tsx`)**:
+  - Removed debug JSON output.
+- **Metrics Forecast Chart (`components/metrics/ForecastDisplay.tsx`)**:
+  - Fixed incorrect Y-axis scaling for percentage-based metrics (e.g., Conversion Rate).
+  - Fixed confidence band rendering by registering `Filler` plugin and refining dataset configuration.
+  - Replaced statistical confidence interval calculation with an artificial percentage-based band for visual clarity.
+  - Added UI control ("Confidence Level") to allow users to adjust the artificial confidence band width (1-50%).
+  - Implemented custom increment/decrement buttons for the Confidence Level input with styling consistent with other controls.
+  - Fixed Y-axis scale to be stable when adjusting confidence level by setting absolute min/max based on widest potential band.
+  - Ensured chart fills available width by setting `maintainAspectRatio: false`.
+  - Removed `beginAtZero: true` from Y-axis for better data centering.
+  - Corrected internal data handling to consistently use raw metric values (e.g., 5.1 for 5.1%) for calculations and rely on formatters only for display.
+- **Metrics Historical Chart (`components/metrics/MetricChart.tsx`)**:
+  - Added dynamic Y-axis domain (`domain` prop) based on data range plus padding for better vertical centering.
+  - Changed line interpolation type from `monotone` to `linear` to prevent artificial curves on flat data.
+- **Utilities (`utils/forecastUtils.ts`)**:
+  - Refactored `calculateForecast` to support artificial confidence band calculation based on a passed percentage.
+  - Corrected internal value handling (removed `/ 100` division in `calculateTrend`).
+
+### Fixed
+- Resolved various visual rendering issues on forecast and historical metric charts related to axis scaling, confidence bands, and line interpolation.
+- Fixed linter errors related to incorrect type names (`loan_size` vs `average_loan_size`).
+
+## [v0.0.4c] - 2025-04-06
 ### Added
 - Enhanced `calculateRoadmapSchedule` utility (`utils/schedulingUtils.ts`) to calculate and return `roadmap_start_month` and a detailed `monthlyAllocation` map showing effort allocated per initiative per month.
 - Added `getMonthsBetween` utility function to `utils/dateUtils.ts`.

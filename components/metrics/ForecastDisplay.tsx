@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import { DbMetricType } from '../../types/database';
 import { HistoricalMetric } from '../../types/metrics';
@@ -14,6 +14,7 @@ import {
   Tooltip,
   Legend,
   TimeScale,
+  Filler,
   ChartOptions,
   ScaleType,
   TooltipItem,
@@ -29,7 +30,8 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  TimeScale
+  TimeScale,
+  Filler
 );
 
 interface ForecastDisplayProps {
@@ -37,13 +39,30 @@ interface ForecastDisplayProps {
   metricType: DbMetricType;
   forecastMonths?: number;
   showConfidenceBands?: boolean;
+  artificialConfidenceDecimal?: number;
 }
+
+// NEW: Local formatter specifically for this component's display
+const formatForecastDisplayValue = (value: number, type: DbMetricType): string => {
+  switch (type) {
+    case 'conversion':
+    case 'interest_rate':
+      // Format as percentage, assuming input is already percentage points
+      return `${value.toFixed(1)}%`; // Reduced precision slightly for forecast
+    case 'average_loan_size':
+      // Use a simplified currency format or reuse global if needed
+      return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    default:
+      return value.toString();
+  }
+};
 
 export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
   metrics,
   metricType,
   forecastMonths = 6,
   showConfidenceBands = true,
+  artificialConfidenceDecimal
 }) => {
   // Calculate date range based on current date and forecast period
   const dateRange = useMemo(() => {
@@ -54,10 +73,51 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
     return { start, end };
   }, [forecastMonths]);
 
-  // Calculate forecast using all historical data
-  const { projectedValues, confidenceInterval } = useMemo(() => {
-    return calculateForecast(metrics, forecastMonths);
+  // Step 1: Calculate projected values (depends on metrics, forecastMonths)
+  const projectedValues = useMemo(() => {
+    console.log("Recalculating Projected Values...") // Debug log
+    try {
+      if (!metrics || metrics.length < 2) {
+        console.warn('ForecastDisplay: Not enough metrics for forecast value calculation.');
+        return [];
+      }
+      // Call calculateForecast just for projected values (pass dummy confidence?)
+      // Or better: Refactor calculateForecast slightly later if needed, for now just call it
+      const result = calculateForecast(metrics, forecastMonths);
+      return result.projectedValues;
+    } catch (error) {
+      console.error("Error calculating projected values:", error);
+      return [];
+    }
   }, [metrics, forecastMonths]);
+
+  // Step 2: Calculate confidence interval (using current percentage)
+  const confidenceInterval = useMemo(() => {
+    console.log("Recalculating Confidence Interval...") // Debug log
+    // Need the forecast logic again or pass relevant parts (slope, intercept, stdErr etc)
+    // Simpler for now: recalculate fully but only use the interval part
+    // This avoids major refactor of calculateForecast for now
+    try {
+        if (!metrics || metrics.length < 2) {
+           return undefined;
+        }
+        // Recalculate but only care about the interval, using the decimal prop
+        const result = calculateForecast(metrics, forecastMonths, artificialConfidenceDecimal);
+        return result.confidenceInterval;
+    } catch (error) {
+        console.error("Error calculating confidence interval:", error);
+        return undefined;
+    }
+  }, [metrics, forecastMonths, artificialConfidenceDecimal, projectedValues]); // projectedValues dependency might be redundant if metrics/months cover it
+
+  useEffect(() => {
+    if (metricType === 'conversion') {
+        console.log("ForecastDisplay Debug - metricType:", metricType);
+        console.log("ForecastDisplay Debug - Metrics Input:", metrics);
+        console.log("ForecastDisplay Debug - Projected Values:", projectedValues);
+        console.log("ForecastDisplay Debug - Confidence Interval:", confidenceInterval);
+    }
+  }, [metricType, metrics, projectedValues, confidenceInterval]);
 
   // Filter historical data to show only last 3 months
   const visibleMetrics = useMemo(() => {
@@ -67,6 +127,24 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
       .filter(m => m.month >= threeMonthsAgo)
       .sort((a, b) => a.month.getTime() - b.month.getTime());
   }, [metrics]);
+
+  // Step 3: Calculate Y-axis Min/Max based on WIDEST possible band (50%)
+  const allYValuesFixedRange = useMemo(() => {
+    const historicalYs = visibleMetrics.map(m => m.value);
+    const forecastYs = projectedValues.map(p => p.value);
+
+    // Simulate bounds at max percentage (0.5 for 50%)
+    const MAX_CONFIDENCE_DECIMAL = 0.50;
+    const lowerBoundMaxYs = projectedValues.map(p => Math.max(0, p.value - (p.value * MAX_CONFIDENCE_DECIMAL)));
+    const upperBoundMaxYs = projectedValues.map(p => p.value + (p.value * MAX_CONFIDENCE_DECIMAL));
+
+    return [...historicalYs, ...forecastYs, ...lowerBoundMaxYs, ...upperBoundMaxYs];
+  }, [visibleMetrics, projectedValues]); // Depends only on forecast line
+
+  const yMinFixed = useMemo(() => allYValuesFixedRange.length > 0 ? Math.min(...allYValuesFixedRange) : 0, [allYValuesFixedRange]);
+  const yMaxFixed = useMemo(() => allYValuesFixedRange.length > 0 ? Math.max(...allYValuesFixedRange) : 100, [allYValuesFixedRange]);
+
+  const yPaddingFixed = useMemo(() => (yMaxFixed - yMinFixed) * 0.1, [yMinFixed, yMaxFixed]); // 10% padding
 
   const chartData = {
     datasets: [
@@ -98,8 +176,9 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
           })),
           borderColor: 'rgba(153, 102, 255, 0.2)',
           backgroundColor: 'rgba(153, 102, 255, 0.1)',
-          fill: '+1',
-          pointRadius: 0
+          fill: '1',
+          pointRadius: 0,
+          tension: 0.1
         },
         {
           label: 'Lower Bound',
@@ -109,8 +188,9 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
           })),
           borderColor: 'rgba(153, 102, 255, 0.2)',
           backgroundColor: 'rgba(153, 102, 255, 0.1)',
-          fill: false,
-          pointRadius: 0
+          fill: '1',
+          pointRadius: 0,
+          tension: 0.1
         }
       ] : [])
     ]
@@ -118,6 +198,7 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
 
   const options: ChartOptions<'line'> = {
     responsive: true,
+    maintainAspectRatio: false,
     interaction: {
       intersect: false,
       mode: 'index'
@@ -133,10 +214,12 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
       },
       y: {
         type: 'linear',
-        beginAtZero: true,
+        // Use FIXED min/max based on widest possible range
+        min: Math.max(0, yMinFixed - yPaddingFixed),
+        max: yMaxFixed + yPaddingFixed,
         ticks: {
           callback: function(value) {
-            return formatMetricValue(Number(value), metricType);
+            return formatForecastDisplayValue(Number(value), metricType);
           }
         }
       }
@@ -152,8 +235,10 @@ export const ForecastDisplay: React.FC<ForecastDisplayProps> = ({
         callbacks: {
           label: function(context: TooltipItem<'line'>) {
             if (context.raw && typeof context.raw === 'object' && 'y' in context.raw) {
-              const value = Number(context.raw.y);
-              return `${context.dataset.label}: ${formatMetricValue(value, metricType)}`;
+              const originalValue = Number(context.raw.y);
+              const label = context.dataset.label || '';
+              // Reverted: Use the original value for formatting
+              return `${label}: ${formatForecastDisplayValue(originalValue, metricType)}`;
             }
             return '';
           }

@@ -25,12 +25,14 @@ export default function MetricsPage() {
   const [showGrid, setShowGrid] = useState(true);
   const [forecastMonths, setForecastMonths] = useState(6);
   const [showConfidenceBands, setShowConfidenceBands] = useState(true);
+  const [confidencePercentage, setConfidencePercentage] = useState(5);
   const [dateRange, setDateRange] = useState(() => {
     const end = new Date();
     const start = new Date();
     start.setMonth(end.getMonth() - 6); // Default to 6 months
     return { start, end };
   });
+  const [metricsData, setMetricsData] = useState<HistoricalMetric[]>([]);
 
   const supabaseClient = useSupabaseClient<Database>();
 
@@ -79,11 +81,13 @@ export default function MetricsPage() {
       }).filter(Boolean) as HistoricalMetric[] || [];
       
       setMetrics(formattedData);
+      setMetricsData(formattedData);
     } catch (err) {
       console.error("Error fetching metrics:", err);
       const message = err instanceof Error ? err.message : 'Failed to load historical metrics.';
       setError(message);
       setMetrics([]);
+      setMetricsData([]);
     } finally {
       setIsLoading(false);
     }
@@ -116,6 +120,15 @@ export default function MetricsPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-8">Historical Metrics</h1>
+
+      {/* Temporary Debug Output */}
+      <details className="mb-4">
+        <summary className="cursor-pointer text-sm text-gray-500">Show Raw Metrics Data (Debug)</summary>
+        <pre className="mt-2 p-2 bg-gray-100 rounded overflow-x-auto text-xs">
+          {JSON.stringify(metricsData, null, 2)}
+        </pre>
+      </details>
+      {/* End Temporary Debug Output */}
 
       <div className="bg-white rounded-lg shadow p-6 mb-8">
         <h2 className="text-lg font-semibold mb-4">Add New Metric</h2>
@@ -207,12 +220,15 @@ export default function MetricsPage() {
                       onForecastMonthsChange={setForecastMonths}
                       showConfidenceBands={showConfidenceBands}
                       onToggleConfidenceBands={() => setShowConfidenceBands(!showConfidenceBands)}
+                      confidencePercentage={confidencePercentage}
+                      onConfidencePercentageChange={setConfidencePercentage}
                     />
                     <ForecastDisplay
                       metrics={filteredMetrics}
                       metricType={activeTab}
                       forecastMonths={forecastMonths}
                       showConfidenceBands={showConfidenceBands}
+                      artificialConfidenceDecimal={confidencePercentage / 100}
                     />
                   </div>
                 )}

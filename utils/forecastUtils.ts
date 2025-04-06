@@ -28,8 +28,8 @@ export function calculateTrend(metrics: HistoricalMetric[]): TrendResult {
   const startDate = sortedMetrics[0].month;
   const xValues = sortedMetrics.map(m => dateFnsDifferenceInMonths(m.month, startDate));
   
-  // For percentages, convert to decimal form for calculation
-  const yValues = sortedMetrics.map(m => m.value / 100);
+  // Use the raw yValues (do not divide by 100 here)
+  const yValues = sortedMetrics.map(m => m.value); // Use raw value
 
   // Calculate means
   const xMean = xValues.reduce((a, b) => a + b, 0) / xValues.length;
@@ -68,7 +68,7 @@ export function calculateTrend(metrics: HistoricalMetric[]): TrendResult {
 export function calculateForecast(
   metrics: HistoricalMetric[], 
   months: number,
-  confidenceLevel: number = 0.95
+  artificialConfidenceDecimal?: number
 ): ForecastResult {
   if (!metrics.length) {
     throw new Error('No historical data available for forecast');
@@ -89,41 +89,28 @@ export function calculateForecast(
   const lastDate = sortedMetrics[sortedMetrics.length - 1].month;
   const baseMonths = dateFnsDifferenceInMonths(lastDate, sortedMetrics[0].month);
 
-  // Calculate projected values (convert back to percentages)
+  // Calculate projected values (using raw trend)
   const projectedValues = Array.from({ length: months }, (_, i) => {
     const month = addMonths(lastDate, i + 1);
     const monthsFromStart = baseMonths + i + 1;
-    const value = Math.max(0, (slope * monthsFromStart + intercept) * 100);
+    const value = Math.max(0, (slope * monthsFromStart + intercept)); // Raw projected value
     return { month: startOfMonth(month), value };
   });
 
-  // Calculate confidence intervals
-  let confidenceInterval;
-  if (metrics.length >= 3) {
-    // Use the standard deviation of residuals for confidence interval
-    const residuals = sortedMetrics.map((m, i) => {
-      const monthsFromStart = dateFnsDifferenceInMonths(m.month, sortedMetrics[0].month);
-      const predicted = (slope * monthsFromStart + intercept) * 100;
-      return m.value - predicted;
-    });
-    
-    const standardError = Math.sqrt(
-      residuals.reduce((sum, res) => sum + res * res, 0) / (residuals.length - 2)
-    );
-    
-    const zScore = confidenceLevel === 0.95 ? 1.96 : 1.645;
+  // Calculate *ARTIFICIAL* confidence intervals based on passed percentage or default
+  const confidencePercentageToUse = artificialConfidenceDecimal ?? 0.05; // Revert to using percentage
 
-    confidenceInterval = projectedValues.map(({ month, value }, i) => {
-      const margin = standardError * zScore * Math.sqrt(1 + (1 / metrics.length) + Math.pow(i + 1, 2) / xxSum);
-      return {
-        month,
-        upper: value + margin,
-        lower: Math.max(0, value - margin)
-      };
-    });
-  }
+  const confidenceInterval = projectedValues.map(({ month, value }) => {
+    // Use percentage for margin calculation
+    const margin = value * confidencePercentageToUse; 
+    return {
+      month,
+      upper: value + margin,
+      lower: Math.max(0, value - margin) // Ensure lower bound doesn't go below 0
+    };
+  });
 
-  return { projectedValues, confidenceInterval };
+  return { projectedValues, confidenceInterval }; // Return raw values
 }
 
 /**
