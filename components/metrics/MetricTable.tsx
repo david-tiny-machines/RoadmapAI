@@ -40,7 +40,7 @@ export default function MetricTable({ metrics, metricType }: MetricTableProps) {
                 {metric.value.toFixed(2)}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {new Date(metric.updatedAt).toLocaleDateString()}
+                {new Date(metric.updated_at).toLocaleDateString()}
               </td>
             </tr>
           ))}
