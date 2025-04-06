@@ -31,7 +31,46 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - v0.1.3a: First iteration of Phase 3, PRD complete
 - v1.0.0: First major release
 
-## [v0.0.3j] - 2025-04-07
+## [Unreleased]
+
+## [v0.0.4a] - 2025-04-06
+### Added
+- Created SQL seed script (`db/seeds/01_test_data.sql`) to populate `historical_metrics`, `monthly_capacity`, and `initiatives` with test data, including date constraints.
+- Implemented scheduling utility (`utils/schedulingUtils.ts`) with `calculateRoadmapSchedule` function.
+  - Sorts initiatives by mandatory status, then priority score.
+  - Allocates effort against monthly capacity.
+  - Calculates `roadmap_delivery_month` for each initiative.
+  - Respects `start_month` as earliest allocation constraint.
+  - Adds `deadline_missed` flag based on `end_month` target.
+  - Returns initiatives in the calculated schedule order.
+- Added database check constraint `valid_date_range` to `initiatives` table (`start_month` IS NULL OR `end_month` IS NULL OR `end_month` >= `start_month`).
+- Added validation (`min="0"`, `max="100"`) to "Uplift (%)" input in `InitiativeForm.tsx`.
+- Created test page (`pages/dev/test-schedule.tsx`) to display scheduler output.
+
+### Changed
+- Updated `db/schema.sql` to include the `valid_date_range` constraint.
+- Clarified that `uplift` in `initiatives` table represents a percentage (0-100).
+- Updated seed script `priority_score` calculations to align with `calculatePriorityScore` utility function.
+- Updated `v0.0.4a-plan.md` and `phase-4-high-level-plan.md` to reflect detailed scheduling logic and test results.
+
+### Fixed
+- Corrected database constraint `valid_date_range` logic to allow NULL start/end dates.
+- Fixed incorrect initial `priority_score` calculation in seed script.
+- Fixed `calculateRoadmapSchedule` return value to preserve scheduling order.
+- Fixed various import path errors (`@/` alias issues).
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+### Known Issues
+- Forecasting logic (v0.0.4d) needs revision to handle `uplift` consistently as a percentage.
+
+## [v0.0.3j] - 2025-04-06
 ### Added
 - Added Supabase tables (`scenarios`, `scenario_initiatives`), RLS policies, and triggers via SQL Editor to support Phase 4 Scenario Planning.
 - Updated `db/schema.sql` to include definitions for `scenarios` and `scenario_initiatives` tables.

@@ -34,7 +34,14 @@ A lightweight tool that integrates roadmapping, prioritisation, forecasting, and
 ### 1. Initiative Input UI
 Add initiatives with:
 - Name
-- Value lever impacted (e.g., Conversion, Average Loan Size, Interest Rate, Customer Acquisition, Customer Retention, Cost Reduction, Compliance/Risk Mitigation, BAU obligations)
+- Value lever impacted (i.e.
+Conversion
+Average loan size
+Interest rate
+Customer acquisition
+Customer retention
+Business as usual (BAU)
+)
 - Estimated uplift (%)
 - Confidence (0–100%)
 - Effort estimate (in days)
@@ -119,32 +126,33 @@ Helps stakeholders understand when value is delivered and how team capacity is a
     - Data validation rules
   - Real-time sync capabilities
 
-### 🔁 Phase 4: Scenario & Goal Planning
-- Initiative impact modeling:
-  - Connect initiatives to metric forecasts
-  - Calculate cumulative uplift from initiatives
-  - Show baseline vs initiative-adjusted forecasts
-- Clone, tweak, and compare roadmap options
-- Leverage Supabase for:
-  - Scenario storage and versioning
-  - User permissions and sharing
-  - Real-time collaboration features
+### 🔁 Phase 4: Roadmap Visualization (Single Scenario)
+- **Initiative Impact Visualization:**
+  - Connect initiatives to forecasts for the *single* current roadmap.
+  - Calculate cumulative uplift (based on value lever, uplift %, confidence, dates).
+  - Show baseline vs. initiative-adjusted forecasts for key metrics.
+  - Ensure forecasts update dynamically with initiative changes.
+- **Timeline & Capacity Visualization:**
+  - Display initiatives chronologically against monthly available capacity.
+  - Visualize total effort per month and flag over-capacity periods.
+  - Ensure timeline/capacity view updates dynamically with initiative changes.
+- Continues to leverage Supabase for data persistence.
 
-### 🧮 Phase 5: Timeline & Capacity Visualisation
-- Gantt-style layout
-- Team usage and resource fit
-- Enhanced Supabase features:
-  - Team capacity tracking
-  - Resource allocation history
-  - Advanced querying for timeline views
+### 🧮 Phase 5: Scenario Management
+- Introduce saving, loading, cloning, and naming multiple roadmap scenarios.
+- Allow users to select an active scenario to view/edit.
+- Implement a comparison view for side-by-side analysis of scenarios (timelines, forecasts, capacity).
+- Leverage Supabase for scenario storage, versioning, and potentially user permissions.
 
-### 🛠️ Phase 6: Admin Interface
-- Monthly team capacity inputs
-- Version history and sharing
-- Complete Supabase integration:
-  - Admin role management
-  - Audit logging
-  - Data export/import capabilities
+### 🛠️ Phase 6: Goal Seeking & Admin Interface
+- **Goal Setting:** Allow users to define target metrics/dates within a scenario context.
+- **Admin Interface:**
+  - Monthly team capacity inputs.
+  - User management and role definition.
+  - Version history and sharing controls.
+  - Data export/import capabilities.
+- **(Future/Advanced):** Implement goal-seeking logic to suggest initiative combinations.
+- Complete Supabase integration for admin roles, audit logging, etc.
 
 ## 🧠 Assumptions
 - Value levers, uplift %, and effort estimates are input manually

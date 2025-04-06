@@ -111,6 +111,10 @@ CREATE TABLE IF NOT EXISTS initiatives (
   priority_score DOUBLE PRECISION NOT NULL
 );
 
+-- Add the corrected date range constraint
+ALTER TABLE initiatives
+ADD CONSTRAINT valid_date_range CHECK (start_month IS NULL OR end_month IS NULL OR end_month >= start_month);
+
 -- Create index for initiatives
 CREATE INDEX initiatives_user_id_idx ON initiatives (user_id);
 
