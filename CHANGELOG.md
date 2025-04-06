@@ -33,6 +33,16 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 
 ## [Unreleased]
 
+## [v0.0.4f] - 2025-04-08  // Replace with today's date
+### Changed
+- Modified Supabase Row Level Security (RLS) policies for `initiatives`, `historical_metrics`, and `monthly_capacity` tables to allow all authenticated users read access (`SELECT`) and write access (`INSERT`, `UPDATE`, `DELETE`), replacing previous user-specific policies.
+- Removed client-side `user_id` filters from data fetching logic in `pages/capacity/index.tsx`, `components/initiatives/InitiativeList.tsx`, and `pages/roadmap/index.tsx` to ensure all data permitted by RLS is retrieved.
+- Removed `user_id` filter from real-time subscription in `components/initiatives/InitiativeList.tsx` to allow observation of changes made by any user.
+- Removed `user_id` filter from `handleDelete` in `components/initiatives/InitiativeList.tsx` to align with permissive write RLS policy.
+
+### Fixed
+- Resolved issue where users could only see their own initiatives, capacity data, and metrics, despite RLS policy intending broader access. Data is now globally visible to all authenticated users.
+
 ## [v0.0.4e] - 2025-04-08
 ### Added
 - **Initiative Impact Visualization (Forecast View):**

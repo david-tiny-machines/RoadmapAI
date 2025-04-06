@@ -113,6 +113,7 @@ function DeleteModal({ isOpen, onConfirm, onCancel }: DeleteModalProps) {
 export default function InitiativeList() {
   const { user } = useAuth();
   const supabaseClient = useSupabaseClient<Database>();
+
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingInitiative, setEditingInitiative] = useState<Initiative | undefined>();
@@ -138,11 +139,10 @@ export default function InitiativeList() {
       setIsLoading(true);
       setError(null);
       
-      console.log('Loading initiatives for user:', user.id);
+      console.log('Loading initiatives...');
       const { data, error: dbError } = await supabaseClient
         .from('initiatives')
         .select('*')
-        .eq('user_id', user.id)
         .order('priority_score', { ascending: false });
 
       if (dbError) throw dbError;
@@ -171,15 +171,18 @@ export default function InitiativeList() {
   useEffect(() => {
     if (!user || !supabaseClient) return;
 
-    console.log('Setting up subscription for user:', user.id, 'channel:', channelName);
+    console.log('Setting up global initiative subscription...');
     let isSubscribed = true;
 
+    // Use a fixed channel name for global updates
+    const globalChannelName = 'public:initiatives';
+
     const subscription = supabaseClient
-      .channel(channelName)
+      .channel(globalChannelName) // Changed channel name
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'initiatives', filter: `user_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'initiatives' }, // REMOVED filter
         async (payload: SupabaseRealtimePayload<DbInitiativeType>) => {
-          console.log('Received change event:', {
+          console.log('Received global change event:', {
             type: payload.eventType,
             timestamp: new Date().toISOString(),
             payload
@@ -238,14 +241,14 @@ export default function InitiativeList() {
       });
 
     return () => {
-      console.log('Cleaning up subscription:', channelName);
+      console.log('Cleaning up subscription:', globalChannelName);
       isSubscribed = false;
       if (supabaseClient) {
         supabaseClient.removeChannel(subscription);
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, channelName, supabaseClient]);
+  }, [user?.id, supabaseClient]); // Removed channelName dependency, user?.id maybe still needed if other logic depends on it, review later if needed
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -293,19 +296,24 @@ export default function InitiativeList() {
 
   const handleDelete = async (id: string) => {
     if (!user || !supabaseClient) {
-       setError('Cannot delete initiative: User or database connection unavailable.');
-       return; 
+        setError('Cannot delete: User or database connection unavailable.');
+        return;
     }
-    setError(null);
 
     try {
+      setError(null);
+      console.log(`Attempting to delete initiative ${id}`);
       const { error: deleteError } = await supabaseClient
         .from('initiatives')
         .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('id', id);
 
       if (deleteError) throw deleteError;
+
+      console.log(`Initiative ${id} marked for deletion.`);
+      // No need to manually remove from state here if relying on subscription
+      // If subscription is slow or unreliable, uncomment below:
+      // setInitiatives(current => current.filter(item => item.id !== id));
     } catch (error) {
       console.error('Error deleting initiative:', error);
       setError(error instanceof Error ? error.message : 'Failed to delete initiative');

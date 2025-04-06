@@ -47,12 +47,10 @@ export default function Capacity() {
           supabaseClient
             .from('initiatives')
             .select('*')
-            .eq('user_id', user.id)
             .order('priority_score', { ascending: false }),
           supabaseClient
             .from('monthly_capacity')
             .select('*')
-            .eq('user_id', user.id)
             .gte('month', firstMonthDbFormat)
             .lte('month', lastMonthDbFormat)
             .order('month', { ascending: true })

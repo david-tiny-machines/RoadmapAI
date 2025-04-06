@@ -34,8 +34,7 @@ const RoadmapPage: React.FC = () => {
         // Fetch Initiatives
         const { data: initiativesData, error: initiativesError } = await supabase
           .from('initiatives')
-          .select('*')
-          .eq('user_id', session.user.id);
+          .select('*');
 
         if (initiativesError) throw new Error(`Failed to fetch initiatives: ${initiativesError.message}`);
         if (!initiativesData) throw new Error('No initiatives data returned from query.');
@@ -44,7 +43,6 @@ const RoadmapPage: React.FC = () => {
         const { data: capacityData, error: capacityError } = await supabase
           .from('monthly_capacity')
           .select('*')
-          .eq('user_id', session.user.id)
           .order('month', { ascending: true });
 
         if (capacityError) throw new Error(`Failed to fetch capacity: ${capacityError.message}`);
