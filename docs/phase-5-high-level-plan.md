@@ -125,6 +125,34 @@ Phase 5 will be delivered incrementally:
     *   Significant changes to prompt engineering.
     *   Potential adjustments to conversation flow logic to handle feedback loops on suggestions.
 
+### v0.0.5i: Basic Cookie-Based Session Management & Reset (In-Memory)
+
+*   **Goal:** Implement unique, temporary sessions for each user/browser using cookies (without database persistence) and provide a way for users to manually clear their current session. Sessions will still be lost on server restart.
+*   **Functionality:**
+    *   **Backend (`/api/agents/prd-generator`):**
+        *   **Cookie Handling:**
+            *   Check for a specific session ID cookie (e.g., `prdAgentSessionId`).
+            *   If the cookie exists and corresponds to an active session in the in-memory `sessionStore`, use that session.
+            *   If the cookie *doesn't* exist or the session isn't found in memory: Generate a new unique ID, create a new session entry in `sessionStore`, and send a `Set-Cookie` header to store the new ID.
+            *   Replace hardcoded `'test-session'` with the dynamic session ID.
+        *   **Clear Session Command:**
+            *   Detect a specific user input or command (e.g., sending `message: '/newchat'`).
+            *   If the clear command is received:
+                *   Remove the corresponding session data from the in-memory `sessionStore`.
+                *   Send a `Set-Cookie` header back to the client with an expired date/Max-Age=0 for the session cookie to clear it.
+                *   Respond in a way that signals the frontend to refresh or reset its state (e.g., send back the initial greeting message as if it were a brand new session).
+    *   **Frontend (`pages/agents/prd-generator.tsx`):**
+        *   Add a "Start New Chat" or similar button to the UI.
+        *   When the button is clicked, send the specific "clear session" command (e.g., `'/newchat'`) to the backend API.
+        *   Update frontend logic to handle the response after clearing the session (e.g., reset the `messages` state to just the initial greeting received from the backend).
+*   **Technical Considerations:**
+    *   Cookie reading/setting libraries/methods in Next.js.
+    *   Cookie configuration (Path, HttpOnly, SameSite, clearing via Max-Age/Expires).
+    *   Generating unique IDs (`crypto.randomUUID()`).
+    *   Choosing the clear session command (e.g., `/newchat`).
+    *   Frontend state management for reset.
+    *   Sessions remain in-memory and are lost on server restarts.
+
 ## Technical Considerations
 
 *   **Frontend:** Next.js, React, TypeScript, TailwindCSS

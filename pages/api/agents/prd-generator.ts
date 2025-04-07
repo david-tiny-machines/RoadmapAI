@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs'; // Import Supabase client helper
+import { Database } from '@/types/supabase'; // Import generated types
 
 // --- Define ChatMessage Interface locally for API ---
 interface ChatMessage {
@@ -15,6 +16,8 @@ interface SessionData {
     availableInitiatives?: { id: string, name: string }[]; // Store fetched initiatives for validation
     selectedInitiativeId?: string | null;
     isNewInitiative?: boolean;
+    retrievedRawContext?: Partial<Database['public']['Tables']['initiatives']['Row']>; // Store fetched details
+    ragFetchError?: string; // Store user-facing error if fetch fails
 }
 // --- End Session Data Structure ---
 
@@ -46,9 +49,10 @@ const systemPrompt: ChatMessage = {
     role: 'system',
     content: `You are a helpful assistant guiding a user to create a concise Product Requirements Document (PRD) for an MVP.
 First, you will present a list of existing initiatives or the option to create a new one. Await the user's selection.
+If the user selects an existing initiative, context about it (like name, value lever, uplift, confidence, effort) might be provided in a separate system message. Use this context to tailor your follow-up questions where relevant.
 Once the user selects an initiative or 'New', acknowledge their choice and then guide them sequentially through these sections:
 1. Overview: Ask for Executive Summary, then Primary Problem, then Target Segments.
-2. Product Requirements (Simplified): Ask for Solution Summary, then Key Success Metrics.
+2. Product Requirements (Simplified): Ask for Solution Summary, then Key Success Metrics. **Specifically, when asking for Key Success Metrics, relate your question to the initiative's 'Value Lever' if context was provided.**
 3. Risks & Assumptions: Ask for major risks or assumptions.
 Once the user has provided input for risks/assumptions, inform them they can type /done to generate the PRD.
 Keep your responses concise. Acknowledge the user's input for one section before prompting for the next piece of information within that section or moving to the next section.`,
@@ -56,11 +60,38 @@ Keep your responses concise. Acknowledge the user's input for one section before
 // --- End System Prompt ---
 
 // --- Function to Extract PRD Data using OpenAI --- 
-async function extractPrdData(history: ChatMessage[]): Promise<ExtractedPrdData | null> {
-    console.log('Attempting to extract PRD data from history...');
-    // Filter out the initial system prompt and potentially the initiative selection messages
-    // before sending to extraction, if they might confuse it. For now, send all.
-    const relevantHistory = history.filter(msg => msg.role !== 'system'); // Basic filter
+// Pass sessionId for logging purposes
+async function extractPrdData(history: ChatMessage[], sessionId: string): Promise<ExtractedPrdData | null> {
+    console.log(`[${sessionId}] Attempting to extract PRD data from history...`);
+    
+    // Filter out system messages (except main), the final /done command, 
+    // AND the assistant message immediately preceding the /done command if it prompts for it.
+    const historyForExtraction = history.filter((msg, index, arr) => {
+        const isLastMessage = index === arr.length - 1;
+        const isSecondLastMessage = index === arr.length - 2;
+
+        // Exclude the very last message if it's the /done command
+        if (isLastMessage && msg.role === 'user' && msg.content.toLowerCase() === '/done') {
+            return false;
+        }
+
+        // Exclude the second-to-last message IF the last message was /done and this one is the assistant prompting for it
+        if (isSecondLastMessage && 
+            arr[arr.length - 1]?.role === 'user' && 
+            arr[arr.length - 1]?.content.toLowerCase() === '/done' && 
+            msg.role === 'assistant' && 
+            msg.content.includes('/done')) { 
+            console.log(`[${sessionId}] Filtering out assistant prompt preceding /done.`); 
+            return false;
+        }
+
+        // Keep the original system prompt, discard other system messages (like RAG context)
+        if (msg.role === 'system' && msg.content !== systemPrompt.content) {
+            return false;
+        }
+        // Keep all other messages
+        return true;
+    });
 
     const extractionPrompt: ChatMessage = {
         role: 'system',
@@ -73,21 +104,28 @@ async function extractPrdData(history: ChatMessage[]): Promise<ExtractedPrdData 
           "keyMetrics": ["string1", "string2", ...] | null,
           "risksAssumptions": "string | null"
         }
-        Conversation History:`
+        Conversation History:` // Keep this note for clarity, but don't include the actual history string here.
     };
+    
+    // === Log the messages being sent for extraction ===
+    console.log("--- DEBUG: Messages for Extraction Call START ---");
+    // Log the messages array directly
+    console.log([extractionPrompt, ...historyForExtraction]); 
+    console.log("--- DEBUG: Messages for Extraction Call END ---");
+    // === End logging ===
 
-    // Combine extraction prompt + relevant history as the content for the extraction call
-    const historyString = relevantHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n');
+    // Construct the messages array correctly
     const extractionMessages: ChatMessage[] = [
-        extractionPrompt,
-        { role: 'user', content: historyString } // Pass history as user message
+        extractionPrompt, 
+        ...historyForExtraction // Spread the filtered history messages directly
     ];
 
     try {
         const completion = await openai.chat.completions.create({
-            model: 'gpt-4', // Or a model known for good JSON output
+            model: 'gpt-4o', // <-- Use gpt-4o for extraction
             messages: extractionMessages,
             temperature: 0.2, // Lower temperature for more deterministic JSON output
+            response_format: { type: "json_object" }, // Force JSON output mode
         });
 
         const replyContent = completion.choices[0]?.message?.content;
@@ -106,7 +144,7 @@ async function extractPrdData(history: ChatMessage[]): Promise<ExtractedPrdData 
             console.error('Failed to parse JSON from AI extraction:', parseError);
              console.error('Raw content was:', replyContent);
              // Attempt to find JSON within ```json ... ``` block if exists
-             const match = replyContent.match(/```json\\n([\s\S]*?)\\n?```/);
+             const match = replyContent.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
              if (match && match[1]) {
                  try {
                      jsonData = JSON.parse(match[1]);
@@ -202,7 +240,8 @@ export default async function handler(
     // Initialize Supabase Client (outside try/catch for clearer error handling if it fails)
     let supabase;
     try {
-        supabase = createServerSupabaseClient({ req, res });
+        // Use Database generic for type safety
+        supabase = createServerSupabaseClient<Database>({ req, res });
     } catch (initError) {
         console.error('Failed to initialize Supabase client:', initError);
         return res.status(500).json({ message: 'Server configuration error.' });
@@ -250,174 +289,216 @@ export default async function handler(
                  initiatives.forEach((initiative, index) => {
                     initialMessageContent += `${index + 1}. ${initiative.name}\n`;
                  });
-                 initialMessageContent += "New - Start a PRD for a completely new initiative.\n\nPlease reply with the number of the initiative or the word \"New\".";
-            } else {
-                initialMessageContent += "Let's start creating a new PRD. First, what's the executive summary?";
+                 initialMessageContent += `${initiatives.length + 1}. New Initiative\n\n`;
+                 initialMessageContent += "Please reply with the number of your choice.";
+             } else {
+                 initialMessageContent += "Let's start creating a new PRD. What is the executive summary?"; // Fallback if no initiatives
             }
-            console.log(`[${sessionId}] Constructed initial message content (first 100 chars): ${initialMessageContent.substring(0,100)}`);
 
-            const initialAssistantMessage: ChatMessage = { role: 'assistant', content: initialMessageContent };
+            const initialAssistantMessage: ChatMessage = {
+                role: 'assistant',
+                content: initialMessageContent,
+            };
 
             // Initialize session data
             sessionData = {
-                history: [systemPrompt, initialAssistantMessage],
-                availableInitiatives: initiatives.length > 0 ? initiatives : undefined, // Store if fetched
-                selectedInitiativeId: null,
-                isNewInitiative: initiatives.length === 0 ? true : undefined, // Assume new if no initiatives exist
-            };
+                 history: [systemPrompt, initialAssistantMessage],
+                 availableInitiatives: initiatives, // Store for later validation
+                 selectedInitiativeId: undefined,
+                 isNewInitiative: undefined,
+                 retrievedRawContext: undefined, // Initialize RAG fields
+                 ragFetchError: undefined,
+             };
             sessionStore.set(sessionId, sessionData);
 
-            // Return the initial greeting immediately
-            console.log(`[${sessionId}] Initialization complete. Sending initial greeting response.`);
-            return res.status(200).json({ reply: initialAssistantMessage.content });
+            console.log(`[${sessionId}] Session initialized. Sending initial greeting.`);
+             // Return only the initial assistant message to the client
+             return res.status(200).json({ message: initialAssistantMessage, ragError: null });
+
         } else {
-             console.log(`[${sessionId}] Found existing session data. Skipping initialization.`);
-        }
-        // --- End Session Initialization ---
+             console.log(`[${sessionId}] Existing session found. Processing user message.`);
+             // Existing session, process the incoming message
+            const { message: userMessageContent } = req.body;
 
-        // --- Request Body Validation ---
-        const { message: newUserMessage } = req.body;
-        if (!newUserMessage || typeof newUserMessage !== 'object' || !newUserMessage.role || !newUserMessage.content) {
-            return res.status(400).json({ message: 'Request body must contain a valid message object { role: \'user\', content: string }' });
-        }
-        if (newUserMessage.role !== 'user') {
-            return res.status(400).json({ message: 'Message role must be \'user\'' });
-        }
-        // --- End Request Body Validation ---
+            // --- Handle Refresh Initialization --- 
+            if (userMessageContent === '__INITIALIZE__') {
+                console.log(`[${sessionId}] Received __INITIALIZE__ on existing session. Sending last message.`);
+                const lastMessage = sessionData.history[sessionData.history.length - 1];
+                // Also check if there was a pending RAG error from the *previous* turn
+                const lastRagError = sessionData.ragFetchError; 
+                return res.status(200).json({ message: lastMessage, ragError: lastRagError || null });
+            }
+            // --- End Handle Refresh Initialization ---
 
-        // --- Check for End Trigger Command ---
-        const isDoneCommand = newUserMessage.content.trim().toLowerCase() === '/done';
-        // --- End Trigger Check ---
-
-        // Retrieve history from session data for potential use
-        let currentHistory = sessionData.history;
-
-        // --- Handle Generation Request (/done) ---
-        if (isDoneCommand) {
-            // Prevent /done if initiative selection is still pending
-            const needsSelection = sessionData.isNewInitiative === undefined && sessionData.availableInitiatives && sessionData.availableInitiatives.length > 0;
-            if(needsSelection) {
-                console.log(`[${sessionId}] /done received but initiative selection pending. Re-prompting.`);
-                const initialGreeting = sessionData.history.find(m => m.role === 'assistant')?.content || "";
-                const listPart = initialGreeting.split('\n\n').slice(1).join('\n\n');
-                const repromptContent = `Please select an initiative or 'New' first.
-
-${listPart}`;
-                 return res.status(200).json({ reply: repromptContent });
+            if (!userMessageContent || typeof userMessageContent !== 'string' || userMessageContent.trim() === '') {
+                return res.status(400).json({ message: 'Message content is required.' });
             }
 
-            console.log(`[${sessionId}] Received /done command. Attempting extraction...`);
-            const extractedData = await extractPrdData(currentHistory); // Pass current history (without /done)
+            const userMessage: ChatMessage = { role: 'user', content: userMessageContent.trim() };
 
-            if (extractedData) {
-                const markdownOutput = formatJsonToMarkdown(extractedData);
-                // Clear session data after successful generation
-                sessionStore.delete(sessionId);
-                console.log(`[${sessionId}] PRD generated and session cleared.`);
-                // Return the generated Markdown
-                return res.status(200).json({ markdown: markdownOutput });
-            } else {
-                console.log(`[${sessionId}] Extraction failed.`);
-                // Don't clear history if extraction failed
-                return res.status(500).json({ message: 'Failed to extract PRD data from conversation. Please check logs or try adding more detail.' });
-            }
-        }
-        // --- End Generation Request Handling ---
+            // Add user message to history *before* checking for /done or processing selection
+            sessionData.history.push(userMessage);
+            console.log(`[${sessionId}] Added user message to history. History length: ${sessionData.history.length}`);
 
-        // --- Handle First User Response (Initiative Selection) ---
-        // Check if selection hasn't been made yet (isNewInitiative is undefined) and initiatives were presented
-        const needsSelection = sessionData.isNewInitiative === undefined && sessionData.availableInitiatives && sessionData.availableInitiatives.length > 0;
+             // --- Handle Initiative Selection OR /done OR Normal Turn --- 
+             let requiresOpenAICall = true; // Assume we need to call OpenAI unless an early exit happens
 
-        if (needsSelection) {
-            console.log(`[${sessionId}] Handling first user response for initiative selection.`);
-            const inputText = newUserMessage.content.trim().toLowerCase();
-            const availableInitiatives = sessionData.availableInitiatives!; // Safe due to check above
-            let selectionValid = false;
-            let acknowledgementContent = "";
-            let selectedInitiativeName = "";
+            // 1. Check if Initiative Selection is needed
+            if (sessionData.selectedInitiativeId === undefined) {
+                 console.log(`[${sessionId}] Processing initiative selection response.`);
+                 let selectedOptionText = '';
+                 let isValidSelection = false;
+                 // let ragError = null; // RAG error is now part of sessionData
 
-            // Try parsing as number
-            const selectedNumber = parseInt(inputText, 10);
-            if (!isNaN(selectedNumber) && selectedNumber > 0 && selectedNumber <= availableInitiatives.length) {
-                const selectedInitiative = availableInitiatives[selectedNumber - 1];
-                sessionData.selectedInitiativeId = selectedInitiative.id;
-                sessionData.isNewInitiative = false;
-                selectionValid = true;
-                selectedInitiativeName = selectedInitiative.name;
-                acknowledgementContent = `Okay, let's start a PRD for '${selectedInitiativeName}'. First, what's the executive summary?`;
-                console.log(`[${sessionId}] User selected initiative #${selectedNumber}: ${selectedInitiativeName}`);
-            } else if (inputText === 'new') {
-                sessionData.selectedInitiativeId = null;
-                sessionData.isNewInitiative = true;
-                selectionValid = true;
-                acknowledgementContent = "Okay, let's start a new PRD. First, what's the executive summary?";
-                console.log(`[${sessionId}] User selected 'New'.`);
-            }
+                 try {
+                    const selectedIndex = parseInt(userMessage.content, 10) - 1;
+                    const numAvailable = sessionData.availableInitiatives?.length ?? 0;
 
-            if (selectionValid) {
-                // Add user selection message to history
-                sessionData.history.push(newUserMessage);
-                // Create and add acknowledgement message to history
-                const acknowledgementMessage: ChatMessage = { role: 'assistant', content: acknowledgementContent };
-                sessionData.history.push(acknowledgementMessage);
-                // Update session store
-                sessionStore.set(sessionId, sessionData);
-                // Return acknowledgement message
-                return res.status(200).json({ reply: acknowledgementContent });
-            } else {
-                 console.log(`[${sessionId}] Invalid selection: '${newUserMessage.content}'. Re-prompting.`);
-                // Invalid selection, re-prompt
-                const initialGreeting = sessionData.history.find(m => m.role === 'assistant')?.content || "";
-                const listPart = initialGreeting.split('\n\n').slice(1).join('\n\n');
-                const repromptContent = `Sorry, I didn't understand that. Please reply with the number of the initiative or the word "New".
+                    if (selectedIndex >= 0 && selectedIndex < numAvailable) {
+                         // Selected an existing initiative
+                         const selectedInitiative = sessionData.availableInitiatives![selectedIndex];
+                         sessionData.selectedInitiativeId = selectedInitiative.id;
+                         sessionData.isNewInitiative = false;
+                         selectedOptionText = `Selected Initiative: ${selectedInitiative.name}`; // For history
+                         isValidSelection = true;
+                         console.log(`[${sessionId}] User selected existing initiative: ID ${selectedInitiative.id}, Name: ${selectedInitiative.name}`);
 
-${listPart}`;
-                return res.status(200).json({ reply: repromptContent });
-                // Note: We don't add the invalid user message or the re-prompt to history here.
-            }
-        }
-        // --- End First User Response Handling ---
+                        // --- RAG Fetch Logic --- 
+                        try {
+                            console.log(`[${sessionId}] Attempting RAG fetch for initiative ID: ${sessionData.selectedInitiativeId}`);
+                            const { data: initiativeDetails, error: dbError } = await supabase
+                                .from('initiatives')
+                                .select('name, value_lever, uplift, confidence, effort_estimate') 
+                                .eq('id', sessionData.selectedInitiativeId)
+                                .single();
 
-        // --- Normal Conversation Turn --- 
-        console.log(`[${sessionId}] Handling normal conversation turn.`);
-        // Add the new user message to the history for this turn
-        const updatedHistory = [...currentHistory, newUserMessage];
+                            if (dbError) {
+                                console.error(`[${sessionId}] RAG Fetch Error:`, dbError);
+                                sessionData.retrievedRawContext = undefined;
+                                sessionData.ragFetchError = "Sorry, I couldn't retrieve the specific details for that initiative right now. Let's continue with the general questions.";
+                            } else if (initiativeDetails) {
+                                console.log(`[${sessionId}] RAG Fetch Success.`);
+                                sessionData.retrievedRawContext = initiativeDetails;
+                                sessionData.ragFetchError = undefined;
+                            } else {
+                                console.warn(`[${sessionId}] RAG Fetch Warning: No details found.`);
+                                sessionData.retrievedRawContext = undefined;
+                            }
+                        } catch (fetchCatchError) {
+                             console.error(`[${sessionId}] RAG Fetch Exception:`, fetchCatchError);
+                             sessionData.retrievedRawContext = undefined;
+                             sessionData.ragFetchError = "Sorry, an unexpected error occurred while fetching initiative details.";
+                        }
+                         // --- End RAG Fetch Logic ---
 
-        console.log(`[${sessionId}] History sent to OpenAI (conversation):`, updatedHistory.map(m => ({ role: m.role, content: m.content.substring(0, 100) + '...' }))); // Log snippet
+                     } else if (selectedIndex === numAvailable) {
+                         // Selected "New Initiative"
+                         sessionData.selectedInitiativeId = null; 
+                         sessionData.isNewInitiative = true;
+                         selectedOptionText = "Selected: New Initiative"; 
+                         isValidSelection = true;
+                         console.log(`[${sessionId}] User selected New Initiative.`);
+                         sessionData.retrievedRawContext = undefined;
+                         sessionData.ragFetchError = undefined;
+                     } // else: Invalid number handled below
 
-        try {
-            const completion = await openai.chat.completions.create({
-                model: 'gpt-4',
-                messages: updatedHistory,
-                temperature: 0.7,
-            });
+                 } catch (e) {
+                    // Handle non-numeric input, which is also invalid here
+                    console.log(`[${sessionId}] Invalid selection input (not a number).`);
+                    isValidSelection = false; 
+                 }
 
-            const replyContent = completion.choices[0]?.message?.content;
-            const assistantMessage = completion.choices[0]?.message;
-
-            if (!replyContent || !assistantMessage) {
-                console.error('OpenAI response missing content or message structure:', completion);
-                return res.status(500).json({ message: 'Failed to get valid reply structure from AI' });
+                 if (!isValidSelection) {
+                     // Invalid selection, ask again
+                     const replyMessage: ChatMessage = {
+                         role: 'assistant',
+                         content: "Sorry, that wasn't a valid selection. Please enter the number corresponding to your choice.",
+                     };
+                     // IMPORTANT: Remove the invalid user message from history before saving/responding
+                     sessionData.history.pop(); 
+                     sessionStore.set(sessionId, sessionData); 
+                     requiresOpenAICall = false; // Don't call OpenAI after invalid selection
+                     return res.status(200).json({ message: replyMessage, ragError: sessionData.ragFetchError || null });
+                 } 
+                 // If selection was valid, requiresOpenAICall remains true, and we proceed below
             }
 
-            // Store Updated History (including this turn's user + assistant messages)
-            sessionData.history = [...updatedHistory, assistantMessage as ChatMessage]; // Update history in sessionData
-            sessionStore.set(sessionId, sessionData); // Save updated session data
-            console.log(`[${sessionId}] Updated stored history (conversation turn).`);
+            // 2. Check for /done command (only if selection is complete)
+            // Note: This condition is now checked even immediately after a valid selection
+            if (sessionData.selectedInitiativeId !== undefined && userMessage.content.toLowerCase() === '/done') {
+                console.log(`[${sessionId}] /done command received. Generating Markdown.`);
+                const extractedData = await extractPrdData(sessionData.history, sessionId);
+                requiresOpenAICall = false; // Don't call OpenAI after /done
 
-            // Return the latest AI reply content
-            return res.status(200).json({ reply: replyContent });
+                if (extractedData) {
+                    const markdown = formatJsonToMarkdown(extractedData);
+                    console.log(`[${sessionId}] Markdown generated successfully.`);
+                    // Return the markdown content directly in the 'message' field for simplicity? Or a dedicated field? Let's use 'markdown'.
+                    return res.status(200).json({ markdown: markdown, ragError: null }); 
+                } else {
+                    console.error(`[${sessionId}] Failed to extract data or format Markdown.`);
+                    const errorMessage: ChatMessage = {
+                        role: 'assistant',
+                        content: "Sorry, I encountered an error while trying to generate the PRD. Please check the conversation or try again.",
+                    };
+                    // Don't alter history on failure, just return error
+                    return res.status(500).json({ message: errorMessage, ragError: null }); 
+                }
+            }
+            
+            // 3. Handle Normal Conversation Turn (if no early exit occurred)
+            if (requiresOpenAICall) { 
+                console.log(`[${sessionId}] Processing normal turn (or turn after valid selection).`);
+                // --- Prepare and Call OpenAI for a standard turn ---
+                const messagesForOpenAI: ChatMessage[] = [systemPrompt]; 
 
-        } catch (aiError: any) {
-            console.error(`[${sessionId}] Error calling OpenAI API (conversation):`, aiError);
-            const statusCode = aiError.status || 500;
-            const errorMessage = aiError.message || 'Failed to communicate with AI service';
-            return res.status(statusCode).json({ message: errorMessage });
-        }
-        // --- End Normal Conversation Turn ---
+                // Add RAG context message if available 
+                if (sessionData.retrievedRawContext) { // Check if context exists (implies existing initiative selected)
+                    const contextContent = `Context for the selected initiative ('${sessionData.retrievedRawContext.name || 'N/A'}'):\n- Value Lever: ${sessionData.retrievedRawContext.value_lever || 'N/A'}\n- Uplift: ${sessionData.retrievedRawContext.uplift || 'N/A'}%\n- Confidence: ${sessionData.retrievedRawContext.confidence || 'N/A'}%\n- Effort Estimate: ${sessionData.retrievedRawContext.effort_estimate || 'N/A'} days`;
+                    messagesForOpenAI.push({ role: 'system', content: contextContent });
+                    console.log(`[${sessionId}] Added RAG context message to OpenAI prompt.`);
+                }
+
+                // Add the rest of the history (excluding non-primary system messages)
+                messagesForOpenAI.push(...sessionData.history.filter(msg => msg.role === 'user' || msg.role === 'assistant'));
+
+                console.log(`[${sessionId}] Sending ${messagesForOpenAI.length} messages to OpenAI.`);
+
+                const completion = await openai.chat.completions.create({
+                    model: 'gpt-4o', 
+                    messages: messagesForOpenAI,
+                    temperature: 0.7, 
+                });
+
+                const assistantReply = completion.choices[0]?.message;
+
+                if (!assistantReply || !assistantReply.content) {
+                    console.error(`[${sessionId}] OpenAI response missing content.`);
+                    const errorMessage: ChatMessage = {
+                        role: 'assistant',
+                        content: "Sorry, I encountered an issue communicating with the AI. Please try again.",
+                    };
+                    // Remove the user message that caused the error? Maybe not, let user retry.
+                    return res.status(500).json({ message: errorMessage, ragError: null }); 
+                }
+
+                console.log(`[${sessionId}] Received reply from OpenAI.`);
+                sessionData.history.push(assistantReply as ChatMessage); // Add AI reply to history
+
+                // Retrieve RAG error that might have been set during initiative selection
+                const responseRagError = sessionData.ragFetchError;
+                sessionData.ragFetchError = undefined; // Clear error after use
+
+                sessionStore.set(sessionId, sessionData); // Save updated session
+
+                console.log(`[${sessionId}] Sending assistant reply to client. RAG Error: ${responseRagError}`);
+                res.status(200).json({ message: assistantReply, ragError: responseRagError || null });
+            } // End of normal turn processing / OpenAI call block
+            
+        } // End of existing session processing block
 
     } catch (error: any) {
         console.error(`[${sessionId}] Unhandled error in API handler:`, error);
-        return res.status(500).json({ message: 'An unexpected error occurred on the server.' });
+        res.status(500).json({ message: 'An unexpected server error occurred.', error: error.message });
     }
-} 
+}

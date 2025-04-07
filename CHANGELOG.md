@@ -33,6 +33,33 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 
 ## [Unreleased]
 
+## [v0.0.5g] - YYYY-MM-DD // TODO: Replace with current date
+### Added
+- **Retrieval-Augmented Generation (RAG):**
+  - Implemented logic in backend (`pages/api/agents/prd-generator.ts`) to fetch details (`name`, `value_lever`, `uplift`, `confidence`, `effort_estimate`) for selected existing initiatives from Supabase.
+  - Added RAG context injection into the OpenAI prompt as a separate system message.
+  - Implemented error handling for RAG database fetches, storing a user-facing error message (`ragFetchError`) in session state.
+
+### Changed
+- **OpenAI Model:** Updated model usage from `gpt-4` to `gpt-4o` for both conversation generation and JSON extraction in `pages/api/agents/prd-generator.ts`.
+- **System Prompt:** Updated the main system prompt to instruct the AI to use provided RAG context, specifically mentioning relating the Key Success Metrics question to the initiative's Value Lever.
+- **Backend API Response:** Modified the API response structure to include a `ragError: string | null` field alongside the `message` or `markdown` field.
+- **Extraction:**
+  - Refactored `extractPrdData` to send chat history as a proper message array instead of a single stringified user message.
+  - Added `response_format: { type: "json_object" }` to the extraction OpenAI call to enforce JSON output.
+  - Improved history filtering in `extractPrdData` to correctly handle the final `/done` command and the preceding assistant prompt, preventing JSON parsing errors.
+- **Frontend Handling:**
+  - Updated `handleSendMessage` in `pages/agents/prd-generator.tsx` to check for and display `ragError` from the API response as an `[Error]: ...` message.
+  - Fixed initialization logic in `useEffect` (`pages/agents/prd-generator.tsx`) to handle the correct API response structure (`message` field) and request body format.
+  - Fixed refresh logic in backend API to correctly handle `__INITIALIZE__` requests for existing sessions.
+  - Fixed persistent "Thinking..." indicator bug by passing only `isLoading` state to `ChatInterface` component (`pages/agents/prd-generator.tsx`).
+- **Control Flow:** Refactored backend API control flow to correctly handle the transition from initiative selection to the first conversational turn.
+
+### Fixed
+- Resolved multiple bugs related to `/done` command causing JSON parsing errors by enforcing JSON output format and refining history filtering for the extraction model.
+- Fixed page stalling after initiative selection by correcting backend control flow.
+- Fixed persistent "Thinking..." indicator after PRD generation.
+
 ## [v0.0.5f] - 2025-04-08
 ### Added
 - Enhanced AI PRD Agent's initial interaction to present existing initiatives from the database.

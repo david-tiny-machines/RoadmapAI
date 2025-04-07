@@ -23,8 +23,8 @@ const PrdGeneratorPage = () => {
           headers: {
             'Content-Type': 'application/json',
           },
-          // The backend's init logic runs before processing the message if session is new
-          body: JSON.stringify({ message: { role: 'user', content: '__INITIALIZE__' } }), 
+          // Update: Send only the content string, consistent with handleSendMessage
+          body: JSON.stringify({ message: '__INITIALIZE__' }), 
         });
 
         if (!response.ok) {
@@ -36,10 +36,10 @@ const PrdGeneratorPage = () => {
           }]);
         } else {
           const data = await response.json();
-          if (data.reply) {
-            setMessages([{ role: 'assistant', content: data.reply }]);
+          if (data.message && data.message.role && data.message.content) {
+            setMessages([data.message as ChatMessage]); // Use the message object directly
           } else {
-             console.error('Initialization API response missing reply:', data);
+             console.error('Initialization API response missing expected message field:', data);
              setMessages([{ 
                 role: 'assistant', 
                 content: 'Sorry, I received an unexpected response during initialization. Please refresh the page.'
@@ -107,7 +107,8 @@ const PrdGeneratorPage = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: newUserMessage }),
+        // Backend now expects just { message: "content" }
+        body: JSON.stringify({ message: newUserMessage.content }),
       });
 
       if (!response.ok) {
@@ -120,30 +121,43 @@ const PrdGeneratorPage = () => {
         setMessages(prevMessages => [...prevMessages, errorMessage]);
       } else {
         const data = await response.json();
+        
+        // Store messages to add (may include RAG error and AI reply)
+        const messagesToAdd: ChatMessage[] = [];
+
+        // Check for RAG error first
+        if (data.ragError && typeof data.ragError === 'string') {
+          console.warn('RAG Error received from backend:', data.ragError);
+          // Use role: 'assistant' but prepend text to indicate it's an error/system note
+          messagesToAdd.push({ role: 'assistant', content: `[Error]: ${data.ragError}` }); 
+        }
+
         // --- Check for Markdown or Reply --- 
         if (data.markdown) {
           // Generation complete, display Markdown
           setGeneratedMarkdown(data.markdown);
-          const finalMessage: ChatMessage = {
+          messagesToAdd.push({
             role: 'assistant',
             content: 'I have generated the PRD based on our conversation. You can copy or download the Markdown below.'
-          };
-          setMessages(prevMessages => [...prevMessages, finalMessage]);
+          });
           setIsComplete(true); // Mark as complete to disable further input
-        } else if (data.reply) {
+        } else if (data.message && data.message.role && data.message.content) {
           // Normal conversation turn
-          const assistantMessage: ChatMessage = { role: 'assistant', content: data.reply };
-          setMessages(prevMessages => [...prevMessages, assistantMessage]);
+          messagesToAdd.push(data.message as ChatMessage); // Add the actual assistant message
         } else {
-          // Unexpected response
-          console.error('API response missing reply or markdown:', data);
-          const errorMessage: ChatMessage = {
+          // Unexpected response (neither markdown nor valid message)
+          console.error('API response missing message or markdown:', data);
+          messagesToAdd.push({
             role: 'assistant',
             content: 'Sorry, I received an unexpected response from the server. Please try again.',
-          };
-          setMessages(prevMessages => [...prevMessages, errorMessage]);
+          });
         }
         // --- End Check --- 
+
+        // Add all collected messages (RAG error + AI reply/final message) to state
+        if (messagesToAdd.length > 0) {
+          setMessages(prevMessages => [...prevMessages, ...messagesToAdd]);
+        }
       }
     } catch (error: any) {
       console.error('Fetch Error:', error);
@@ -169,8 +183,8 @@ const PrdGeneratorPage = () => {
         <ChatInterface
           messages={messages}
           onSendMessage={handleSendMessage}
-          // Pass combined loading and completion state to disable input
-          isLoading={isLoading || isComplete} 
+          // Pass only the actual loading state for the indicator
+          isLoading={isLoading} 
         />
       </div>
 
