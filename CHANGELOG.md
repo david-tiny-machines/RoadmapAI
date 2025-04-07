@@ -33,7 +33,15 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 
 ## [Unreleased]
 
-## [v0.0.5a] - 2025-04-08
+## [v0.0.5b] - 2025-04-08
+### Added
+- Added "Agents" link to main navigation header (`components/layout/MainLayout.tsx`).
+- Created Agent list page (`pages/agents/index.tsx`) with a link to the PRD Generator.
+- Created PRD Generator agent page (`pages/agents/prd-generator.tsx`).
+- Implemented basic, non-functional chat UI component (`components/agents/ChatInterface.tsx`) with message display area, input field, and send button (placeholder functionality).
+- Created `docs/v0.0.5b-plan.md` detailing the implementation steps.
+
+## [v0.0.5a] - 2025-04-07
 ### Added
 - Created backend API route (`pages/api/agents/prd-generator.ts`) for the AI PRD Agent.
 - Integrated basic OpenAI client (`openai` package) setup and API key handling.
@@ -498,53 +506,4 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 - Value lever and metric type overlap:
   - While display/database conversion is now handled, architectural decision needed on shared business logic
   - Consider unifying calculation and validation logic for shared metrics/levers
-- Missing database constraints for initiative fields (`effort_estimate` should be positive).
-- Inconsistent timestamp handling between database and application:
-  - Database uses TIMESTAMPTZ while application uses string types
-  - No standardized approach to timezone handling across components
-  - Risk of timestamp-related bugs in date comparisons and sorting
-- Generic error handling doesn't provide specific feedback for different error types
-- Admin-only metrics functionality exists in database but admin interface is planned for Phase 6
-- Database constraint forces metric values to be ≥ 0, which may not support negative interest rates in the future
-
-## [v0.0.2b]
-### Fixed
-- Initiative drag and drop prioritization now correctly maintains mandatory-before-optional ordering
-- Prevented mandatory initiatives from being moved below optional initiatives
-- Ensured drag and drop behavior aligns with priority rules from PRD
-
-### Technical
-- Enhanced `handleDragEnd` function in InitiativeList component to enforce ordering constraints
-- Added validation check for mandatory-to-optional initiative moves
-
-## [v0.0.2a]
-### Added
-- Initiative list view with priority display
-- Priority score calculation based on impact and confidence
-- Basic initiative management:
-  - Create new initiatives
-  - Edit existing initiatives
-  - Delete initiatives with confirmation
-- Mandatory vs optional initiative handling
-- Date range support for initiatives
-
-### Changed
-- Enhanced initiative card layout
-- Improved data structure for initiatives
-- Updated priority calculation logic
-
-## [v0.0.1a]
-### Added
-- Basic project structure and configuration
-- Core UI components:
-  - Layout system
-  - Navigation header
-  - Basic forms
-- Initial routing setup
-- Development environment configuration
-
-### Technical
-- Next.js project setup
-- TypeScript configuration
-- Tailwind CSS integration
-- Basic component architecture 
+- Missing database constraints for initiative fields (`effort_estimate`
