@@ -33,6 +33,26 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 
 ## [Unreleased]
 
+## [v0.0.5e] - 2025-04-08
+### Added
+- Implemented `/done` command in backend API (`pages/api/agents/prd-generator.ts`) to trigger PRD generation.
+- Added `extractPrdData` function using a separate OpenAI call to extract structured data (JSON) from conversation history.
+- Added `formatJsonToMarkdown` function to convert extracted JSON into formatted Markdown.
+- Added state management (`generatedMarkdown`, `isComplete`) to frontend page (`pages/agents/prd-generator.tsx`).
+- Added conditional UI rendering on frontend for displaying generated Markdown in a `textarea` and providing "Copy to Clipboard" and "Download .md File" buttons.
+- Implemented copy-to-clipboard and file download logic on the frontend.
+- Added session clearing in backend upon successful Markdown generation.
+- Created `docs/v0.0.5e-plan.md` detailing the implementation steps.
+
+### Changed
+- Updated backend API handler to differentiate between normal conversation turns and the `/done` command, returning `{ markdown: ... }` on completion.
+- Updated frontend `handleSendMessage` to check for `markdown` key in API response and update state accordingly.
+- Updated `ChatInterface` to accept and use combined `isLoading || isComplete` state to disable input.
+- Refined system prompt in backend API to instruct user about the `/done` command.
+
+### Fixed
+- Removed unsupported `response_format: { type: "json_object" }` parameter from OpenAI call in `extractPrdData` function for compatibility with `gpt-4` model.
+
 ## [v0.0.5d] - 2025-04-08
 ### Added
 - Implemented in-memory session store (`Map`) in the backend API (`pages/api/agents/prd-generator.ts`) to maintain conversation history between requests (non-persistent).
