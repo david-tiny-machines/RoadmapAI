@@ -6,20 +6,58 @@ const PrdGeneratorPage = () => {
   // State for messages
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   // State for loading status
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Start false, set true during init fetch
   // State for the final generated Markdown output
   const [generatedMarkdown, setGeneratedMarkdown] = useState<string | null>(null);
   // State to track if generation is complete to disable input
   const [isComplete, setIsComplete] = useState(false);
 
-  // Add initial greeting message from assistant on component mount
+  // Fetch the initial greeting message from the backend API on component mount
   useEffect(() => {
-    setMessages([
-      {
-        role: 'assistant',
-        content: 'Hello! I can help you generate a Product Requirements Document (PRD). To start, could you please provide the executive summary for your initiative?'
+    const initializeChat = async () => {
+      setIsLoading(true);
+      try {
+        // Send a placeholder message to trigger backend initialization
+        const response = await fetch('/api/agents/prd-generator', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          // The backend's init logic runs before processing the message if session is new
+          body: JSON.stringify({ message: { role: 'user', content: '__INITIALIZE__' } }), 
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+          console.error('Initialization API Error:', response.status, errorData);
+          setMessages([{ 
+            role: 'assistant', 
+            content: `Sorry, I couldn't initialize the chat: ${errorData.message || response.statusText}. Please refresh the page.` 
+          }]);
+        } else {
+          const data = await response.json();
+          if (data.reply) {
+            setMessages([{ role: 'assistant', content: data.reply }]);
+          } else {
+             console.error('Initialization API response missing reply:', data);
+             setMessages([{ 
+                role: 'assistant', 
+                content: 'Sorry, I received an unexpected response during initialization. Please refresh the page.'
+             }]);
+          }
+        }
+      } catch (error: any) {
+        console.error('Initialization Fetch Error:', error);
+        setMessages([{ 
+          role: 'assistant', 
+          content: `Sorry, I couldn't connect to the server for initialization: ${error.message}. Please check your connection and refresh.` 
+        }]);
+      } finally {
+        setIsLoading(false);
       }
-    ]);
+    };
+
+    initializeChat();
   }, []); // Empty dependency array ensures this runs only once on mount
 
   // Handle copying markdown to clipboard

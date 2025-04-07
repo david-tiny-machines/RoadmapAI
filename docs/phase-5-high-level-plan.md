@@ -87,6 +87,44 @@ Phase 5 will be delivered incrementally:
     *   Frontend UI elements for export/copy.
     *   Handling the final state transition.
 
+### v0.0.5f: Initiative Selection on Start
+
+*   **Goal:** Enhance the agent's starting interaction to query existing initiatives and allow the user to select one or start a new PRD.
+*   **Functionality:**
+    *   Backend fetches initiatives from Supabase on session start.
+    *   Initial greeting message dynamically includes the list of initiatives and a "New" option.
+    *   Backend handles the user's first response to select an initiative or "New".
+*   **Technical Considerations:**
+    *   Supabase client interaction in API route.
+    *   Updating initial message generation logic.
+    *   Handling the first user response specifically.
+
+### v0.0.5g: Retrieval-Augmented Generation (RAG) Integration
+
+*   **Goal:** Enhance the agent's responses by dynamically retrieving and incorporating specific details about the selected initiative during the PRD generation conversation.
+*   **Functionality:**
+    *   Identify key points in the conversation where initiative data is relevant (e.g., discussing problem, impact).
+    *   Backend retrieves specific data fields (e.g., `value_lever`, `uplift`, `effort_estimate`) for the selected initiative from Supabase before certain LLM calls.
+    *   Retrieved data is formatted and injected into the LLM prompt.
+    *   LLM uses the augmented prompt to generate more context-aware questions or statements.
+*   **Technical Considerations:**
+    *   Conditional Supabase queries within the main conversation loop.
+    *   Advanced prompt engineering to instruct the LLM on using retrieved data.
+    *   Potential need for more robust session state management to track conversation progress and trigger retrieval.
+
+### v0.0.5h: Suggestive Content Generation
+
+*   **Goal:** Make the agent more proactive by suggesting draft content for PRD sections (e.g., executive summary, metrics) based on retrieved initiative data, rather than just asking open-ended questions.
+*   **Functionality:**
+    *   Update system prompt to instruct the agent to suggest content first when context (from RAG) is available.
+    *   LLM uses retrieved initiative details (via RAG from v0.0.5g) to formulate relevant suggestions.
+    *   Agent presents the suggestion and asks for user confirmation or modification.
+    *   Backend logic potentially needs refinement to handle user feedback on suggestions.
+*   **Technical Considerations:**
+    *   Requires successful implementation of RAG (v0.0.5g).
+    *   Significant changes to prompt engineering.
+    *   Potential adjustments to conversation flow logic to handle feedback loops on suggestions.
+
 ## Technical Considerations
 
 *   **Frontend:** Next.js, React, TypeScript, TailwindCSS

@@ -33,6 +33,26 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 
 ## [Unreleased]
 
+## [v0.0.5f] - 2025-04-08
+### Added
+- Enhanced AI PRD Agent's initial interaction to present existing initiatives from the database.
+- Implemented initiative selection flow at the start of PRD generation sessions.
+- Added Supabase integration in the PRD generator API route to fetch existing initiatives.
+- Added session state management to track selected initiative context.
+- Added fallback greeting for cases where no initiatives exist in the database.
+
+### Changed
+- Modified the initial greeting to display a numbered list of existing initiatives.
+- Updated conversation flow to handle initiative selection before proceeding with PRD questions.
+- Enhanced message display in ChatInterface to properly render multi-line messages.
+- Updated system prompt to acknowledge selected initiative in responses.
+
+### Technical
+- Added initiative fetching logic using Supabase client in the API route.
+- Implemented parsing logic for initiative selection responses.
+- Enhanced session state to store selected initiative context.
+- Added comprehensive test coverage for initiative selection flow.
+
 ## [v0.0.5e] - 2025-04-08
 ### Added
 - Implemented `/done` command in backend API (`pages/api/agents/prd-generator.ts`) to trigger PRD generation.
