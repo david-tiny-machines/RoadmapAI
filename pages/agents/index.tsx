@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import MainLayout from '../../components/layout/MainLayout';
+// Remove MainLayout import if no longer needed, or keep if other layout elements are used
+// import MainLayout from '../../components/layout/MainLayout';
 
 const AgentsPage = () => {
   return (
-    <MainLayout>
+    <>
       <h1 className="text-3xl font-bold text-gray-900 mb-6">
         AI Agents
       </h1>
@@ -38,7 +39,7 @@ const AgentsPage = () => {
         </div>
         */}
       </div>
-    </MainLayout>
+    </>
   );
 };
 

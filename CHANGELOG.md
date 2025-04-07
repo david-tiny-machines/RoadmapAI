@@ -33,6 +33,25 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 
 ## [Unreleased]
 
+## [v0.0.5c] - 2025-04-08
+### Added
+- Implemented state management (`useState`) for messages and loading status on PRD Generator page (`pages/agents/prd-generator.tsx`).
+- Added initial assistant greeting message using `useEffect` on PRD Generator page.
+
+### Changed
+- Connected frontend chat interface (`ChatInterface.tsx`) to the backend API (`/api/agents/prd-generator`).
+- Implemented `handleSendMessage` function in `pages/agents/prd-generator.tsx` to:
+    - Perform optimistic UI update for user messages.
+    - Send message history to the backend API using `fetch`.
+    - Handle successful API responses by adding assistant replies to state.
+    - Handle API/network errors gracefully and update UI state.
+    - Manage `isLoading` state during API calls.
+- Updated `ChatInterface.tsx` to correctly use `onSendMessage` prop and respect `isLoading` state for input/button.
+
+### Fixed
+- Removed redundant `<MainLayout>` wrappers from `pages/agents/index.tsx` and `pages/agents/prd-generator.tsx` to resolve duplicate navigation header issue.
+- Resolved `500 Internal Server Error` caused by missing `OPENAI_API_KEY` environment variable by ensuring it was set correctly in Replit Secrets.
+
 ## [v0.0.5b] - 2025-04-08
 ### Added
 - Added "Agents" link to main navigation header (`components/layout/MainLayout.tsx`).

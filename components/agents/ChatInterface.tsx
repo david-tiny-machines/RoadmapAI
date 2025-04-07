@@ -31,18 +31,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
     setInputValue(event.target.value);
   };
 
-  // Handle sending a message (Placeholder for v0.0.5b)
+  // Handle sending a message
   const handleSend = () => {
-    if (inputValue.trim()) {
-      console.log("Placeholder: Send message:", inputValue); // Placeholder action
-      // In v0.0.5c, this will call props.onSendMessage(inputValue);
-      setInputValue(''); // Clear input after pseudo-send
+    // Check if not loading and input has content
+    if (!isLoading && inputValue.trim()) {
+      onSendMessage(inputValue); // Call the handler passed via props
+      setInputValue(''); // Clear input after sending
     }
   };
 
   // Handle Enter key press in input field
   const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
+    // Check if not loading and Enter key is pressed
+    if (!isLoading && event.key === 'Enter') {
       handleSend();
     }
   };
