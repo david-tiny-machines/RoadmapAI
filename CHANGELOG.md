@@ -33,6 +33,38 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 
 ## [Unreleased]
 
+## [v0.0.5a] - 2025-04-08
+### Added
+- Created backend API route (`pages/api/agents/prd-generator.ts`) for the AI PRD Agent.
+- Integrated basic OpenAI client (`openai` package) setup and API key handling.
+- Implemented initial API logic to receive messages, call OpenAI Chat Completions API with a basic system prompt, and return the AI's response.
+- Added basic error handling for API requests and OpenAI calls.
+- Included placeholder comments for future session/conversation history management.
+- Added `v0.0.5a-plan.md` detailing the implementation steps.
+
+### Changed
+- Updated `docs/PRD.md` build approach to reflect new Phase 5 (AI Agent), Phase 6 (Scenarios), Phase 7 (Goals/Admin).
+- Created `docs/phase-5-high-level-plan.md` outlining the overall plan for the AI PRD Agent MVP.
+
+### Technical
+- Installed `openai` npm package.
+
+### Known Issues
+- API route `/api/agents/prd-generator` is protected by authentication middleware, preventing direct testing with unauthenticated tools like `curl`. Full testing requires frontend integration (`v0.0.5c`).
+
+## [v0.0.4h] - 2025-04-06
+### Changed
+- **Home Page (`pages/index.tsx`)**:
+    - Added navigation links for "Metrics" and "Roadmap".
+    - Reordered navigation buttons to match header order (Initiatives, Capacity, Roadmap, Metrics).
+    - Applied consistent `btn-primary` styling to all navigation buttons.
+- **Metrics Page (`pages/metrics/index.tsx`)**:
+    - Changed default historical data view (`dateRange` state) to 1 year (previously 6 months).
+    - Changed default forecast projection period (`forecastMonths` state) to 1 year (previously 6 months).
+
+### Fixed
+- **Metrics Page**: The "1Y" preset button in the date range selector (`components/metrics/DateRangeSelector.tsx`) is now correctly highlighted by default when loading the Table or Chart views, matching the default 1-year date range.
+
 ## [v0.0.4g] - 2025-04-08  // Replace with today's date
 ### Fixed
 - Resolved multiple build failures caused by various issues:

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getPreviousNMonths, formatMonthYear, fromMonthString } from '../../utils/dateUtils';
 
 interface DateRangeSelectorProps {
@@ -27,6 +27,25 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
   maxDate
 }) => {
   const [activePreset, setActivePreset] = useState<PresetRange | null>(null);
+
+  // Effect to determine active preset from date props
+  useEffect(() => {
+    // Calculate month difference
+    const monthDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 + endDate.getMonth() - startDate.getMonth();
+
+    let matchedPreset: PresetRange | null = null;
+    if (monthDiff === 11) { // Matches our default 1Y logic (end.getMonth() - 11)
+      matchedPreset = '1Y';
+    } else if (monthDiff === 5) { // Matches 6M logic (end.getMonth() - 5)
+      matchedPreset = '6M';
+    } else if (monthDiff === 2) { // Matches 3M logic (end.getMonth() - 2)
+      matchedPreset = '3M';
+    }
+    // Note: A robust 'ALL' check would likely compare start/end dates to minDate/maxDate
+
+    setActivePreset(matchedPreset);
+
+  }, [startDate, endDate, minDate, maxDate]); // Rerun when dates change
 
   const handlePresetClick = (preset: PresetRange) => {
     setActivePreset(preset);

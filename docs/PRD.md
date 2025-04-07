@@ -138,13 +138,20 @@ Helps stakeholders understand when value is delivered and how team capacity is a
   - Ensure timeline/capacity view updates dynamically with initiative changes.
 - Continues to leverage Supabase for data persistence.
 
-### 🧮 Phase 5: Scenario Management
+### 🤖 Phase 5: AI PRD Agent (MVP)
+- Implement a conversational AI agent (via new "Agents" UI section) to guide users through creating a basic PRD.
+- Agent asks questions based on a predefined MVP schema (Overview, simple Requirements, Risks/Assumptions).
+- Agent generates a structured Markdown output of the PRD.
+- Leverages OpenAI API for conversational logic.
+- Focus on MVP functionality as defined in `phase-5-high-level-plan.md`.
+
+### 🧮 Phase 6: Scenario Management
 - Introduce saving, loading, cloning, and naming multiple roadmap scenarios.
 - Allow users to select an active scenario to view/edit.
 - Implement a comparison view for side-by-side analysis of scenarios (timelines, forecasts, capacity).
 - Leverage Supabase for scenario storage, versioning, and potentially user permissions.
 
-### 🛠️ Phase 6: Goal Seeking & Admin Interface
+### 🛠️ Phase 7: Goal Setting & Admin Interface
 - **Goal Setting:** Allow users to define target metrics/dates within a scenario context.
 - **Admin Interface:**
   - Monthly team capacity inputs.

@@ -75,12 +75,12 @@ export default function MetricsPage() {
   const [dateRange, setDateRange] = useState(() => {
     const end = new Date();
     const start = new Date();
-    start.setMonth(start.getMonth() - 5);
+    start.setMonth(start.getMonth() - 11);
     return { start, end };
   });
   const [showDataPoints, setShowDataPoints] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
-  const [forecastMonths, setForecastMonths] = useState(6);
+  const [forecastMonths, setForecastMonths] = useState(12);
   const [showConfidenceBands, setShowConfidenceBands] = useState(true);
   const [confidencePercentage, setConfidencePercentage] = useState(10);
   const [isLoading, setIsLoading] = useState(false);

@@ -13,8 +13,14 @@ export default function Home() {
         <Link href="/initiatives" className="btn-primary">
           View Initiatives
         </Link>
-        <Link href="/capacity" className="btn-secondary">
+        <Link href="/capacity" className="btn-primary">
           Manage Capacity
+        </Link>
+        <Link href="/roadmap" className="btn-primary">
+          View Roadmap
+        </Link>
+        <Link href="/metrics" className="btn-primary">
+          View Metrics
         </Link>
       </div>
     </div>
