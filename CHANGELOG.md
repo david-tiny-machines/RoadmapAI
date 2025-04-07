@@ -33,6 +33,21 @@ v[MAJOR].[PRD].[PHASE][ITERATION]
 
 ## [Unreleased]
 
+## [v0.0.5d] - 2025-04-08
+### Added
+- Implemented in-memory session store (`Map`) in the backend API (`pages/api/agents/prd-generator.ts`) to maintain conversation history between requests (non-persistent).
+- Added basic session key handling (using hardcoded key for MVP).
+
+### Changed
+- Refactored backend API route (`pages/api/agents/prd-generator.ts`):
+    - To retrieve/update conversation history from the session store.
+    - To expect a single `message` object in the request body.
+    - Updated system prompt to explicitly guide the AI through MVP PRD sections sequentially.
+    - To pass the full, updated conversation history to the OpenAI API on each turn.
+    - To store the assistant's reply back into the session history.
+- Updated frontend page (`pages/agents/prd-generator.tsx`) to send only the single new user message object (`{ message: ... }`) to the backend API.
+- Created `docs/v0.0.5d-plan.md` detailing the implementation steps.
+
 ## [v0.0.5c] - 2025-04-08
 ### Added
 - Implemented state management (`useState`) for messages and loading status on PRD Generator page (`pages/agents/prd-generator.tsx`).

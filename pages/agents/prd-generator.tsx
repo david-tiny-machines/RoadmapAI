@@ -27,8 +27,8 @@ const PrdGeneratorPage = () => {
     const newUserMessage: ChatMessage = { role: 'user', content: messageContent };
 
     // Optimistic UI update: Add user message immediately
-    const updatedMessages = [...messages, newUserMessage];
-    setMessages(updatedMessages);
+    // Use functional update to ensure we're using the latest state
+    setMessages(prevMessages => [...prevMessages, newUserMessage]);
 
     try {
       const response = await fetch('/api/agents/prd-generator', {
@@ -36,8 +36,8 @@ const PrdGeneratorPage = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        // Send the *entire* current message history for context
-        body: JSON.stringify({ messages: updatedMessages }),
+        // Send only the NEW user message object to the backend
+        body: JSON.stringify({ message: newUserMessage }), 
       });
 
       if (!response.ok) {
